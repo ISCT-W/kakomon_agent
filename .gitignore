@@ -1,0 +1,27 @@
+# Python
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.tmp
+
+# Secrets / env
+.env
+
+# macOS
+.DS_Store
+
+# 过去问原件和由它们生成的一切数据（题库、转写缓存、清单、学习记录、解答存档）只留在本地，不提交。
+# data/ 下只公开知识点表和题目面板页面。
+kakomon/
+data/*
+!data/taxonomy/
+!data/viewer/
+data/viewer/current.json
+
+# Local-only tooling and notes
+.claude/launch.json
+.claude/settings.local.json
+docs/
+demo/

@@ -1,0 +1,9 @@
+# Python 3.12；安装：.venv/bin/python -m pip install -r requirements.txt
+anthropic>=2.8     # 数据管线（Batch API）
+pymupdf>=2.1       # PDF 转页面图片
+pillow>=13.0       # 裁图
+numpy>=2.0         # 查重、讲解时核对数值
+PyYAML>=6.0        # 知识点表
+mcp>=2.3           # MCP 服务
+fsrs>=6.3          # 复习排期
+sympy>=1.14        # 讲解时做符号计算核对

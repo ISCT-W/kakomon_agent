@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "kakomon": {
+      "type": "stdio",
+      "command": "${KAKOMON_PYTHON:-.venv/bin/python}",
+      "args": ["-I", "agent/server.py"],
+      "env": {}
+    }
+  }
+}

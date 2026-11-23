@@ -1,0 +1,657 @@
+# 知识点表 v1：科目 -> 单元 -> 知识点（在 v0 上只追加：新增化学、地球科学与地理、机械工学、分析与几何四个科目，
+# 以及若干知识点；依据是全量打标签时模型报告的表外知识点）
+# 知识点粒度：一个可以单独练习、单独判断会不会的解题技能，通常对应教科书的一节。
+# ID 一经使用不要改名；新增知识点只追加，废弃的标记 deprecated 而不删除。
+version: v1
+subjects:
+- id: la
+  name: 线性代数
+  ja: 線形代数
+  units:
+  - id: la.matrix
+    name: 矩阵与行列式
+    concepts:
+      la.matrix.ops: 矩阵运算、转置与迹
+      la.matrix.inverse: 逆矩阵的计算与存在条件
+      la.matrix.det: 行列式的计算与性质
+      la.matrix.rank: 矩阵的秩
+      la.matrix.special: 特殊矩阵的性质（对称、正交、酉、幂零、幂等、置换矩阵）
+  - id: la.system
+    name: 线性方程组
+    concepts:
+      la.system.gauss: 高斯消元与行简化阶梯形
+      la.system.structure: 解的存在性与解空间结构（齐次/非齐次）
+      la.system.lu: LU 分解
+  - id: la.space
+    name: 向量空间与线性映射
+    concepts:
+      la.space.basis: 线性无关、基与维数
+      la.space.subspace: 子空间的和、交与直和
+      la.space.map: 线性映射与表示矩阵
+      la.space.kernel: 核与像、维数定理
+      la.space.change: 基变换与相似矩阵
+      la.space.function: 函数空间上的线性映射（如微分算子的矩阵表示）
+  - id: la.eigen
+    name: 特征值与对角化
+    concepts:
+      la.eigen.compute: 特征值与特征向量的计算
+      la.eigen.diag: 可对角化判定与对角化
+      la.eigen.power: 矩阵的幂与矩阵函数（A^n、e^A）
+      la.eigen.charpoly: 特征多项式、Cayley-Hamilton 定理与最小多项式
+      la.eigen.jordan: Jordan 标准形
+      la.eigen.symmetric: 实对称/Hermite 矩阵的正交（酉）对角化
+      la.eigen.proof: 特征值相关性质的证明
+  - id: la.inner
+    name: 内积空间
+    concepts:
+      la.inner.gram: Gram-Schmidt 正交化
+      la.inner.projection: 正交投影与正交补空间
+      la.inner.lsq: 最小二乘法
+      la.inner.norm: 向量与矩阵的范数
+  - id: la.quad
+    name: 二次型
+    concepts:
+      la.quad.standard: 二次型的标准化
+      la.quad.definite: 正定性判定
+      la.quad.extremum: 二次型的极值与 Rayleigh 商
+  - id: la.decomp
+    name: 矩阵分解
+    concepts:
+      la.decomp.svd: 奇异值分解
+      la.decomp.qr: QR 分解
+      la.decomp.pseudo: 广义逆矩阵
+  - id: la.geom
+    name: 空间解析几何
+    concepts:
+      la.geom.lineplane: 空间直线与平面
+      la.geom.cross: 外积、体积与距离
+      la.geom.quadric: 二次曲线与二次曲面的分类
+      la.geom.transform: 旋转、反射等几何变换的矩阵表示
+- id: calc
+  name: 微积分
+  ja: 微分積分
+  units:
+  - id: calc.limit
+    name: 极限与级数
+    concepts:
+      calc.limit.sequence: 数列的极限
+      calc.limit.function: 函数的极限与连续性
+      calc.limit.series: 级数的收敛判定
+      calc.limit.power: 幂级数与收敛半径
+  - id: calc.diff
+    name: 一元微分
+    concepts:
+      calc.diff.compute: 导数的计算（含反三角、对数求导）
+      calc.diff.mvt: 中值定理
+      calc.diff.taylor: Taylor 展开与近似
+      calc.diff.extremum: 极值、凹凸与函数图形
+      calc.diff.lhopital: 不定型极限与洛必达法则
+  - id: calc.int
+    name: 一元积分
+    concepts:
+      calc.int.indefinite: 不定积分的技巧（换元、分部、有理函数）
+      calc.int.definite: 定积分的计算
+      calc.int.improper: 反常积分及其收敛性
+      calc.int.application: 积分的应用（面积、弧长、体积）
+      calc.int.estimate: 积分不等式与估计
+  - id: calc.multi
+    name: 多元微分
+    concepts:
+      calc.multi.partial: 偏导数与全微分
+      calc.multi.chain: 链式法则与隐函数
+      calc.multi.extremum: 多元函数的极值（停留点、Hessian）
+      calc.multi.lagrange: 条件极值与 Lagrange 乘数法
+      calc.multi.taylor: 多元 Taylor 展开
+  - id: calc.mint
+    name: 重积分
+    concepts:
+      calc.mint.double: 二重积分与累次积分（交换积分顺序）
+      calc.mint.change: 变量替换与 Jacobian（极坐标等）
+      calc.mint.triple: 三重积分
+      calc.mint.special: 高斯积分、Gamma 函数与 Beta 函数
+- id: vec
+  name: 向量分析
+  ja: ベクトル解析
+  units:
+  - id: vec.diffop
+    name: 微分算子
+    concepts:
+      vec.diffop.grad: 梯度与方向导数
+      vec.diffop.divcurl: 散度与旋度的计算
+      vec.diffop.coord: 柱坐标与球坐标中的运算
+  - id: vec.integral
+    name: 线积分与面积分
+    concepts:
+      vec.integral.line: 线积分
+      vec.integral.surface: 面积分与通量
+      vec.integral.theorem: Green、Gauss、Stokes 定理
+  - id: vec.geometry
+    name: 曲线与曲面的几何
+    concepts:
+      vec.geometry.curve: 曲线的切向量、弧长与曲率
+      vec.geometry.surface: 曲面的法向量、第一基本形式与 Gauss 曲率
+- id: ode
+  name: 微分方程
+  ja: 微分方程式
+  units:
+  - id: ode.first
+    name: 一阶常微分方程
+    concepts:
+      ode.first.separable: 变量分离型与齐次型
+      ode.first.linear: 一阶线性方程与 Bernoulli 方程
+      ode.first.exact: 全微分方程与积分因子
+  - id: ode.linear
+    name: 高阶线性常微分方程
+    concepts:
+      ode.linear.constant: 常系数齐次方程
+      ode.linear.nonhomog: 非齐次方程（待定系数法、常数变易法）
+      ode.linear.euler: Euler 型方程（变量变换 x=e^t）
+      ode.linear.series: 幂级数解法
+  - id: ode.system
+    name: 微分方程组与稳定性
+    concepts:
+      ode.system.matrix: 线性微分方程组（矩阵指数解法）
+      ode.system.stability: 平衡点与稳定性、相平面
+  - id: ode.pde
+    name: 偏微分方程
+    concepts:
+      ode.pde.separation: 分离变量法
+      ode.pde.classic: 热传导、波动、Laplace 方程的求解
+- id: cplx
+  name: 复变函数
+  ja: 複素関数論
+  units:
+  - id: cplx.basic
+    name: 复变函数基础
+    concepts:
+      cplx.basic.function: 复数与初等复变函数
+      cplx.basic.analytic: 正则函数与 Cauchy-Riemann 方程
+  - id: cplx.integral
+    name: 复积分与留数
+    concepts:
+      cplx.integral.cauchy: Cauchy 积分定理与积分公式
+      cplx.integral.laurent: Laurent 展开与奇点分类
+      cplx.integral.residue: 留数定理与实积分的计算
+      cplx.integral.conformal: 共形映射
+- id: trans
+  name: 积分变换与傅里叶分析
+  ja: フーリエ解析・ラプラス変換
+  units:
+  - id: trans.fourier
+    name: 傅里叶分析
+    concepts:
+      trans.fourier.series: 傅里叶级数
+      trans.fourier.transform: 傅里叶变换及其性质
+      trans.fourier.convolution: 卷积与 delta 函数
+  - id: trans.laplace
+    name: 拉普拉斯变换与 z 变换
+    concepts:
+      trans.laplace.transform: 拉普拉斯变换与反变换
+      trans.laplace.ode: 用拉普拉斯变换解微分方程
+      trans.laplace.z: z 变换
+- id: prob
+  name: 概率论
+  ja: 確率論
+  units:
+  - id: prob.basic
+    name: 概率基础
+    concepts:
+      prob.basic.counting: 计数与古典概率
+      prob.basic.conditional: 条件概率、独立性与贝叶斯定理
+  - id: prob.rv
+    name: 随机变量
+    concepts:
+      prob.rv.distribution: 常见分布（二项、泊松、正态、指数等）
+      prob.rv.moment: 期望、方差、协方差与矩母函数
+      prob.rv.multi: 多维随机变量、联合分布与变量变换
+      prob.rv.limit: 大数定律、中心极限定理与概率不等式
+  - id: prob.process
+    name: 随机过程
+    concepts:
+      prob.process.markov: 马尔可夫链（转移矩阵、稳态分布）
+      prob.process.poisson: 泊松过程与到达时间
+      prob.process.queue: 排队论（M/M/1 等）
+- id: stat
+  name: 数理统计
+  ja: 統計学
+  units:
+  - id: stat.inference
+    name: 统计推断
+    concepts:
+      stat.inference.descriptive: 描述统计
+      stat.inference.estimate: 点估计（最大似然、矩估计、无偏性）
+      stat.inference.interval: 区间估计
+      stat.inference.test: 假设检验
+  - id: stat.model
+    name: 统计模型
+    concepts:
+      stat.model.regression: 回归分析
+      stat.model.bayes: 贝叶斯推断
+      stat.model.multivariate: 多变量分析（主成分分析等）
+- id: disc
+  name: 离散数学
+  ja: 離散数学
+  units:
+  - id: disc.set
+    name: 集合与关系
+    concepts:
+      disc.set.basic: 集合、映射与基数
+      disc.set.relation: 等价关系与偏序关系
+  - id: disc.comb
+    name: 组合数学
+    concepts:
+      disc.comb.counting: 排列组合、容斥原理与鸽笼原理
+      disc.comb.recurrence: 递推关系与生成函数
+      disc.comb.induction: 数学归纳法与证明技巧
+  - id: disc.algebra
+    name: 代数结构与数论
+    concepts:
+      disc.algebra.number: 初等数论（同余、欧几里得算法）
+      disc.algebra.group: 群、环、域
+      disc.algebra.lattice: 格与布尔代数
+  - id: disc.graph
+    name: 图论
+    concepts:
+      disc.graph.basic: 图的基本概念与表示（邻接矩阵）
+      disc.graph.tree: 树与生成树
+      disc.graph.path: 路径、连通性、欧拉路与哈密顿路
+      disc.graph.coloring: 着色、平面图与匹配
+- id: logic
+  name: 数理逻辑
+  ja: 論理学
+  units:
+  - id: logic.formal
+    name: 形式逻辑
+    concepts:
+      logic.formal.prop: 命题逻辑（真值表、范式、真理函数的表示）
+      logic.formal.pred: 一阶谓词逻辑（形式化、推理、Tableau、归结）
+      logic.formal.modal: 模态逻辑与可能世界语义
+      logic.formal.concept: 逻辑学基本概念（分析性、Church 论题、完备性）
+- id: algo
+  name: 算法与数据结构
+  ja: アルゴリズムとデータ構造
+  units:
+  - id: algo.analysis
+    name: 算法分析
+    concepts:
+      algo.analysis.complexity: 时间/空间复杂度与 O 记号
+      algo.analysis.recurrence: 递推式求解与主定理
+  - id: algo.ds
+    name: 数据结构
+    concepts:
+      algo.ds.linear: 数组、链表、栈与队列
+      algo.ds.tree: 二叉搜索树与平衡树
+      algo.ds.heap: 堆与优先队列
+      algo.ds.hash: 散列表
+      algo.ds.disjoint: 并查集（素集合データ構造）
+  - id: algo.design
+    name: 算法设计
+    concepts:
+      algo.design.sort: 排序与选择算法
+      algo.design.search: 查找（二分查找等）
+      algo.design.dp: 动态规划
+      algo.design.greedy: 贪心算法
+      algo.design.divide: 分治与递归算法
+      algo.design.string: 字符串算法
+      algo.design.geometry: 计算几何（凸包、扫描线、最近点对）
+  - id: algo.graph
+    name: 图算法
+    concepts:
+      algo.graph.traverse: 图的遍历（BFS、DFS、拓扑排序）
+      algo.graph.shortest: 最短路径算法（Dijkstra、Floyd-Warshall 等）
+      algo.graph.mst: 最小生成树
+      algo.graph.flow: 网络流与二分图匹配
+- id: num
+  name: 数值计算
+  ja: 数値計算
+  units:
+  - id: num.methods
+    name: 数值方法
+    concepts:
+      num.methods.error: 浮点数与误差分析
+      num.methods.root: 非线性方程求根（Newton 法等）
+      num.methods.linear: 线性方程组的数值解法与迭代法
+      num.methods.integration: 数值积分与数值微分
+      num.methods.ode: 常微分方程的数值解法
+      num.methods.interpolation: 插值与函数逼近
+- id: opt
+  name: 最优化与运筹
+  ja: 最適化・オペレーションズリサーチ
+  units:
+  - id: opt.programming
+    name: 数理规划
+    concepts:
+      opt.programming.lp: 线性规划与对偶
+      opt.programming.nonlinear: 非线性规划与 KKT 条件
+      opt.programming.convex: 凸集与凸函数
+      opt.programming.combinatorial: 整数规划与组合优化
+  - id: opt.or
+    name: 运筹学模型
+    concepts:
+      opt.or.model: 生产、库存、调度等运筹模型
+      opt.or.game: 博弈论（纳什均衡、博弈树搜索）
+- id: theory
+  name: 计算理论
+  ja: 計算理論・オートマトン
+  units:
+  - id: theory.automata
+    name: 自动机与形式语言
+    concepts:
+      theory.automata.fa: 有限自动机（DFA/NFA、最小化）
+      theory.automata.regex: 正则表达式与正则语言（泵引理）
+      theory.automata.cfg: 上下文无关文法与下推自动机
+  - id: theory.computability
+    name: 可计算性与复杂性
+    concepts:
+      theory.computability.turing: 图灵机与可判定性
+      theory.computability.complexity: 计算复杂性（P、NP、NP 完全性归约）
+      theory.computability.lambda: λ 演算与程序语义
+- id: prog
+  name: 程序设计与语言
+  ja: プログラミング・言語処理系
+  units:
+  - id: prog.coding
+    name: 程序设计
+    concepts:
+      prog.coding.c: C 语言（指针、结构体、内存管理）
+      prog.coding.trace: 程序追踪与输出预测
+      prog.coding.implement: 编程实现（上机题）
+      prog.coding.recursion: 递归程序
+  - id: prog.language
+    name: 程序语言与处理系统
+    concepts:
+      prog.language.concept: 程序语言概念（类型、作用域、求值策略、函数式、面向对象）
+      prog.language.compiler: 编译原理（词法分析、语法分析、代码生成）
+      prog.language.verification: 程序验证（Hoare 逻辑、循环不变式、正确性证明）
+- id: arch
+  name: 计算机体系结构
+  ja: 計算機アーキテクチャ
+  units:
+  - id: arch.core
+    name: 处理器与存储
+    concepts:
+      arch.core.number: 数的表示（补码、浮点数）
+      arch.core.isa: 指令集与汇编
+      arch.core.pipeline: 流水线与冒险
+      arch.core.cache: Cache 与存储层次
+      arch.core.performance: 性能评估（CPI、Amdahl 定律）
+      arch.core.arithmetic: 运算器设计（加法器、乘法器）
+- id: lc
+  name: 逻辑电路
+  ja: 論理回路
+  units:
+  - id: lc.design
+    name: 逻辑电路设计
+    concepts:
+      lc.design.boolean: 布尔代数与逻辑化简（卡诺图）
+      lc.design.combinational: 组合电路设计（加法器、多路选择器、译码器）
+      lc.design.sequential: 时序电路（触发器、计数器、状态机）
+      lc.design.timing: 延迟与时序分析
+      lc.design.cmos: CMOS 与晶体管级电路
+- id: os
+  name: 操作系统
+  ja: オペレーティングシステム
+  units:
+  - id: os.core
+    name: 操作系统原理
+    concepts:
+      os.core.process: 进程、线程与 CPU 调度
+      os.core.sync: 同步、互斥与死锁
+      os.core.memory: 内存管理与虚拟内存（分页、页面置换、工作集）
+      os.core.file: 文件系统与 I/O
+- id: net
+  name: 计算机网络
+  ja: コンピュータネットワーク
+  units:
+  - id: net.core
+    name: 网络原理
+    concepts:
+      net.core.layer: 分层模型与协议
+      net.core.transport: 传输层（TCP、可靠传输、拥塞控制）
+      net.core.routing: 网络层与路由算法
+      net.core.link: 数据链路层、介质访问控制与差错检测
+      net.core.performance: 时延、吞吐量与网络性能
+      net.core.security: 网络与信息安全（攻击手法、防御、认证）
+- id: db
+  name: 数据库
+  ja: データベース
+  units:
+  - id: db.core
+    name: 数据库原理
+    concepts:
+      db.core.relational: 关系模型与关系代数
+      db.core.sql: SQL
+      db.core.normalization: 函数依赖与规范化
+      db.core.transaction: 事务与并发控制
+- id: info
+  name: 信息论与编码
+  ja: 情報理論・符号理論
+  units:
+  - id: info.theory
+    name: 信息论
+    concepts:
+      info.theory.entropy: 熵、条件熵与互信息
+      info.theory.source: 信源编码（Huffman、Kraft 不等式、算术编码）
+      info.theory.channel: 信道容量
+      info.theory.markov: 马尔可夫信源
+  - id: info.coding
+    name: 编码与密码
+    concepts:
+      info.coding.ecc: 纠错码（汉明码、线性码、循环码）
+      info.coding.crypto: 密码学基础（公钥密码、散列）
+- id: sig
+  name: 信号处理与通信
+  ja: 信号処理・通信
+  units:
+  - id: sig.system
+    name: 信号与系统
+    concepts:
+      sig.system.lti: 线性时不变系统与卷积
+      sig.system.sampling: 采样定理与 A/D 转换
+      sig.system.dft: DFT 与 FFT
+      sig.system.filter: 数字滤波器（FIR/IIR、零极点、稳定性）
+      sig.system.random: 随机信号与功率谱密度
+  - id: sig.comm
+    name: 通信
+    concepts:
+      sig.comm.modulation: 调制方式（AM/FM、PCM、QAM、OFDM）
+      sig.comm.digital: 数字通信与误码率
+- id: ctrl
+  name: 控制工程
+  ja: 制御工学
+  units:
+  - id: ctrl.classic
+    name: 经典控制
+    concepts:
+      ctrl.classic.transfer: 传递函数与方框图
+      ctrl.classic.response: 时间响应与稳态误差
+      ctrl.classic.frequency: 频率响应（Bode 图、Nyquist 图）
+      ctrl.classic.stability: 稳定性判据（Routh-Hurwitz、Nyquist）
+      ctrl.classic.design: 控制器设计（PID、相位补偿）
+  - id: ctrl.modern
+    name: 现代控制
+    concepts:
+      ctrl.modern.state: 状态空间表示与解
+      ctrl.modern.controllability: 可控性与可观测性
+      ctrl.modern.feedback: 状态反馈与极点配置、观测器
+      ctrl.modern.optimal: 最优控制（LQ 调节器、Riccati 方程）
+- id: ml
+  name: 机器学习与模式识别
+  ja: 機械学習・パターン認識
+  units:
+  - id: ml.core
+    name: 机器学习
+    concepts:
+      ml.core.basic: 学习理论基础（过拟合、偏差方差、交叉验证）
+      ml.core.linear: 线性回归与逻辑回归
+      ml.core.classifier: 分类器（SVM、k-NN、决策树、朴素贝叶斯）
+      ml.core.nn: 神经网络与误差反向传播
+      ml.core.unsupervised: 聚类与降维（k-means、PCA）
+      ml.core.probabilistic: 概率模型（EM 算法、HMM、混合高斯）
+      ml.core.optimization: 优化方法（梯度下降等）
+      ml.core.rl: 强化学习（马尔可夫决策过程、Q 学习、策略）
+- id: media
+  name: 媒体信息处理
+  ja: メディア情報処理
+  units:
+  - id: media.core
+    name: 图像、图形、语音与语言
+    concepts:
+      media.core.image: 图像处理（滤波、边缘检测、频域处理）
+      media.core.vision: 计算机视觉（相机模型、几何变换、识别）
+      media.core.graphics: 计算机图形学
+      media.core.speech: 语音与声学信号处理
+      media.core.nlp: 自然语言处理
+- id: ee
+  name: 电气电子
+  ja: 電気電子工学
+  units:
+  - id: ee.circuit
+    name: 电路
+    concepts:
+      ee.circuit.dc: 直流电路分析
+      ee.circuit.ac: 交流电路与复数阻抗、谐振
+      ee.circuit.transient: 过渡现象
+      ee.circuit.electronic: 电子电路（运放、晶体管、二极管、A/D 与 D/A）
+      ee.circuit.power: 电力电子（整流、逆变、晶闸管）
+      ee.circuit.twoport: 二端口网络（阻抗、导纳、传输参数与互易性）
+  - id: ee.em
+    name: 电磁学
+    concepts:
+      ee.em.static: 静电场与电容
+      ee.em.magnetic: 静磁场、电流与电感
+      ee.em.induction: 电磁感应与 Maxwell 方程
+      ee.em.wave: 电磁波与传输线
+  - id: ee.device
+    name: 电子器件
+    concepts:
+      ee.device.semiconductor: 半导体物理与器件
+- id: phys
+  name: 物理
+  ja: 物理学
+  units:
+  - id: phys.core
+    name: 物理学
+    concepts:
+      phys.core.mechanics: 力学（质点、刚体、振动）
+      phys.core.thermo: 热力学
+      phys.core.statistical: 统计力学（分布函数、比热）
+      phys.core.quantum: 量子力学（薛定谔方程、势垒、隧道效应）
+      phys.core.wave: 波动与光学
+      phys.core.solid: 固体物理（晶格振动、能带、电子输运）
+- id: bio
+  name: 生命科学
+  ja: 生命科学
+  units:
+  - id: bio.core
+    name: 生命科学
+    concepts:
+      bio.core.molecular: 分子生物学（DNA、RNA、蛋白质）
+      bio.core.biochem: 生物化学与代谢
+      bio.core.cell: 细胞生物学与发育
+      bio.core.genetics: 遗传学
+      bio.core.immunology: 免疫学与病毒学
+      bio.core.bioinformatics: 生物信息学（序列比对、系统发育、基因组分析）
+      bio.core.ecology: 生态学与进化生物学（种群、群体遗传、系统进化）
+      bio.core.oncology: 癌生物学与医学应用（癌基因、抑癌基因、药物与治疗）
+      bio.core.neurophys: 神经生理学与细胞信号转导
+      bio.core.structure: 蛋白质结构与结构生物学（二级结构、结构预测、实验方法）
+- id: cog
+  name: 认知科学与心理学
+  ja: 心理・認知科学
+  units:
+  - id: cog.core
+    name: 认知科学
+    concepts:
+      cog.core.perception: 知觉与注意
+      cog.core.neuro: 认知神经科学
+      cog.core.memory: 记忆、学习与思考
+      cog.core.method: 心理学研究方法与实验设计
+      cog.core.social: 社会心理学与文化心理学
+      cog.core.development: 发展心理学与学习心理学
+      cog.core.emotion: 情绪、动机与生理心理学指标
+- id: chem
+  name: 化学
+  ja: 化学
+  units:
+  - id: chem.general
+    name: 一般化学
+    concepts:
+      chem.general.structure: 原子结构、化学键与分子结构（电离能、VSEPR、杂化、HSAB）
+      chem.general.thermo: 化学热力学与化学平衡（反应焓、Gibbs 能、平衡常数、溶度积、酸碱）
+      chem.general.kinetics: 化学反应速度论（速率式、反应级数、活化能）
+      chem.general.electro: 电化学与分析化学（电极电位、滴定、沉淀分离）
+  - id: chem.organic
+    name: 有机化学
+    concepts:
+      chem.organic.reaction: 有机反应与反应机理（取代、加成、消除、立体化学）
+      chem.organic.structure: 有机化合物的结构与性质（芳香族性、异构体、官能团）
+  - id: chem.materials
+    name: 材料化学
+    concepts:
+      chem.materials.phase: 材料科学（相图、晶体结构、合金与加工）
+- id: earth
+  name: 地球科学与地理
+  ja: 地球科学・地理学
+  units:
+  - id: earth.science
+    name: 地球科学
+    concepts:
+      earth.science.atmosphere: 大气、海洋与气候（温室效应、大气垂直结构、气候变动）
+      earth.science.solid: 固体地球（地震、板块运动、地球内部构造）
+      earth.science.geology: 地质学与地球化学（岩石、矿物、同位素年代测定）
+  - id: earth.geography
+    name: 地理学
+    concepts:
+      earth.geography.physical: 自然地理学与环境问题
+      earth.geography.human: 人文地理学（区位论、地域研究、地理学史）
+      earth.geography.gis: 地理信息与空间分析
+- id: mech
+  name: 机械工学
+  ja: 機械工学
+  units:
+  - id: mech.solid
+    name: 固体力学与振动
+    concepts:
+      mech.solid.materials: 材料力学（应力应变、梁的弯曲与挠度、扭转）
+      mech.solid.vibration: 机械振动（多自由度系、固有频率、强迫振动）
+  - id: mech.fluid
+    name: 流体与热
+    concepts:
+      mech.fluid.dynamics: 流体力学（连续方程、伯努利定理、势流、粘性流）
+      mech.fluid.heat: 传热学与热机（热传导、对流、热机循环）
+  - id: mech.robot
+    name: 机器人
+    concepts:
+      mech.robot.kinematics: 机器人运动学与动力学（机构、雅可比矩阵、轨迹）
+      mech.robot.control: 机器人控制（力控制、阻抗控制、传感器）
+- id: anal
+  name: 分析与几何
+  ja: 解析学・幾何学
+  units:
+  - id: anal.topology
+    name: 拓扑
+    concepts:
+      anal.topology.general: 一般拓扑（拓扑空间、紧性、连通性、Hausdorff 性）
+  - id: anal.functional
+    name: 泛函分析与变分法
+    concepts:
+      anal.functional.space: 泛函分析（Banach 空间、Hilbert 空间、有界算子）
+      anal.functional.variation: 变分法（泛函极值、Euler-Lagrange 方程、Ritz 法）
+  - id: anal.geometry
+    name: 初等几何
+    concepts:
+      anal.geometry.plane: 平面几何与三角函数
+- id: misc
+  name: 其他
+  ja: その他
+  units:
+  - id: misc.general
+    name: 综合
+    concepts:
+      misc.general.english: 英语（英文和译、和文英译）
+      misc.general.essay: 小论文与论述
+      misc.general.society: 信息社会与伦理
+      misc.general.se: 软件工程（开发过程、测试、建模）
+      misc.general.philosophy: 哲学与科学哲学（伦理学、美学、科学史）
+      misc.general.socialsci: 社会科学（社会学、传媒研究、政治学、国际关系、科学技术社会论）
