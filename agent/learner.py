@@ -174,7 +174,9 @@ def default_focus(con, problem_id, at=None):
 
 def record_attempts(con, problem_id, rows, served_id=None, at=None):
     """
-    记录一次反馈涉及的各个小问（每个小问一条），并更新复习卡片（跳过不更新）。
+    记录一次反馈涉及的各个小问（每个小问一条），并重算这些小问的复习卡片。
+    同一次出题、FOCUS_WINDOW_HOURS 小时内再次记录同一小问时覆盖原记录（批改、提示或讲解后修正结果）：
+    自报结果、错因、备注没有新值时保留原值，用时只在学生自报时更新。
 
     参数:
         con: 数据库连接
@@ -184,33 +186,67 @@ def record_attempts(con, problem_id, rows, served_id=None, at=None):
         served_id: 对应的出题记录 ID
         at: 作答时间（本地时间，默认现在）
     返回:
-        list[dict]，每个小问的记录 ID 与下次复习时间
+        list[dict]，每个小问的记录 ID、下次复习时间（跳过为空）、是否覆盖了原记录 amended
     """
+    since = stamp((at or datetime.now()) - timedelta(hours=FOCUS_WINDOW_HOURS))
     out = []
     for r in rows:
         if r["result"] not in RESULTS:
             raise ValueError(f"result 必须是 {RESULTS} 之一")
-        cur = con.execute(
-            "INSERT INTO attempts (ts, served_id, problem_id, subq_key, subq_label, concept_weights, difficulty, "
-            "question_type, result, self_report, score, hints, solution_viewed, minutes, minutes_source, error_type, "
-            "note, verified, skip_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (stamp(at), served_id, problem_id, r["key"], r["label"], json.dumps(r["weights"], ensure_ascii=False),
-             r["difficulty"], r["question_type"], r["result"], r["self_report"] or r["result"], r["score"],
-             int(r["hints"] or 0), int(bool(r["solution_viewed"])), r["minutes"], r["minutes_source"],
-             r["error_type"], r["note"], int(bool(r["verified"])), r["skip_reason"]))
-        due = ""
-        if r["result"] != "跳过":
-            old = con.execute("SELECT card, reps FROM cards WHERE problem_id = ? AND subq_key = ?",
-                              (problem_id, r["key"])).fetchone()
-            card, due_dt = review.review(old["card"] if old else None, r["result"], to_utc(at),
-                                         r["hints"], r["solution_viewed"])
-            con.execute("INSERT OR REPLACE INTO cards VALUES (?,?,?,?,?,?,?,?)",
-                        (problem_id, r["key"], card, due_dt.isoformat(), r["result"], stamp(at),
-                         (old["reps"] if old else 0) + 1, json.dumps(r["primary"], ensure_ascii=False)))
-            due = due_dt.astimezone().strftime(TS_FMT)
-        out.append({"id": cur.lastrowid, "key": r["key"], "label": r["label"], "next_review": due})
+        old = served_id and con.execute(
+            "SELECT id FROM attempts WHERE served_id = ? AND subq_key = ? AND ts >= ? ORDER BY id DESC LIMIT 1",
+            (served_id, r["key"], since)).fetchone()
+        own = r["minutes_source"] == "自报"
+        if old:
+            con.execute(
+                "UPDATE attempts SET result = ?, self_report = COALESCE(NULLIF(?, ''), self_report), score = ?, hints = ?, "
+                "solution_viewed = MAX(solution_viewed, ?), minutes = CASE WHEN ? THEN ? ELSE minutes END, "
+                "minutes_source = CASE WHEN ? THEN '自报' ELSE minutes_source END, "
+                "error_type = COALESCE(NULLIF(?, ''), error_type), note = COALESCE(NULLIF(?, ''), note), "
+                "verified = MAX(verified, ?), skip_reason = ? WHERE id = ?",
+                (r["result"], r["self_report"], r["score"], int(r["hints"] or 0), int(bool(r["solution_viewed"])),
+                 own, r["minutes"], own, r["error_type"], r["note"], int(bool(r["verified"])), r["skip_reason"], old["id"]))
+            aid = old["id"]
+        else:
+            aid = con.execute(
+                "INSERT INTO attempts (ts, served_id, problem_id, subq_key, subq_label, concept_weights, difficulty, "
+                "question_type, result, self_report, score, hints, solution_viewed, minutes, minutes_source, error_type, "
+                "note, verified, skip_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (stamp(at), served_id, problem_id, r["key"], r["label"], json.dumps(r["weights"], ensure_ascii=False),
+                 r["difficulty"], r["question_type"], r["result"], r["self_report"] or r["result"], r["score"],
+                 int(r["hints"] or 0), int(bool(r["solution_viewed"])), r["minutes"], r["minutes_source"],
+                 r["error_type"], r["note"], int(bool(r["verified"])), r["skip_reason"])).lastrowid
+        due = rebuild_card(con, problem_id, r["key"], r["primary"])
+        out.append({"id": aid, "key": r["key"], "label": r["label"], "next_review": "" if r["result"] == "跳过" else due,
+                    "amended": bool(old)})
     con.commit()
     return out
+
+
+def rebuild_card(con, problem_id, key, primary):
+    """
+    按一个小问的全部作答（跳过除外）依次重算复习卡片；没有作答时删除卡片。
+
+    参数:
+        con: 数据库连接
+        problem_id: 大题 ID
+        key: 规范化小问键
+        primary: 该小问的主知识点（存入卡片）
+    返回:
+        str，下次到期时间（本地时间字符串；没有卡片时为空）
+    """
+    rows = con.execute("SELECT ts, result, hints, solution_viewed FROM attempts WHERE problem_id = ? AND subq_key = ? "
+                       "AND result != '跳过' ORDER BY id", (problem_id, key)).fetchall()
+    if not rows:
+        con.execute("DELETE FROM cards WHERE problem_id = ? AND subq_key = ?", (problem_id, key))
+        return ""
+    card = None
+    for a in rows:
+        card, due = review.review(card, a["result"], to_utc(parse(a["ts"])), a["hints"], a["solution_viewed"])
+    con.execute("INSERT OR REPLACE INTO cards VALUES (?,?,?,?,?,?,?,?)",
+                (problem_id, key, card, due.isoformat(), rows[-1]["result"], rows[-1]["ts"], len(rows),
+                 json.dumps(primary, ensure_ascii=False)))
+    return due.astimezone().strftime(TS_FMT)
 
 
 def all_attempts(con, since=None, until=None):

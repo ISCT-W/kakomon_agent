@@ -298,7 +298,8 @@ def save_solution(problem_id: str, markdown: str, subq_labels: list[str] | None 
 @server.tool()
 def show_problems(problem_ids: list[str], include_solution: bool = False) -> str:
     """
-    把一道或几道题（公式渲染好）显示到题目面板，只是展示，不算出题、不计时。向学生列举例题、对照讲解时使用。
+    把一道或几道题（公式渲染好）显示到题目面板，只是展示，不算出题、不计时。向学生列举例题、对照讲解时使用；
+    其中正在做的题（6 小时内最近出的那道）保留本次重点小问。
 
     参数:
         problem_ids: 大题 ID 列表（按显示顺序）
@@ -313,9 +314,9 @@ def show_problems(problem_ids: list[str], include_solution: bool = False) -> str
         sol = solutions.best(pid, d["solution_md"], d["solution_source"]) if include_solution else None
         if include_solution and not sol:
             unsolved.append(pid)
-        items.append(viewer.item(d, solution=sol))
+        items.append(viewer.item(d, learner.default_focus(LEARN, pid), solution=sol))
     if items:
-        viewer.publish(items, note="展示（未出题）")
+        viewer.publish(items, note="" if any(i["focus"] for i in items) else "展示（未出题）")
     out = {"shown": [i["problem_id"] for i in items], "viewer_url": VIEWER_URL}
     if missing:
         out["missing"] = missing
@@ -331,6 +332,8 @@ def record_attempt(problem_id: str, results: dict[str, str] | None = None, resul
                    verified: bool = False, skip_reason: str = "") -> str:
     """
     记录学生对一道题的作答反馈（每个小问一条）：更新掌握度、安排各小问的下次复习时间。
+    学生报了结果就先记；同一次出题 6 小时内再记同一小问会覆盖原记录（批改有误、看了提示或讲解后结果有变化时用），
+    覆盖时 self_report、error_type、note 留空表示保留原值。
 
     参数:
         problem_id: 大题 ID
@@ -346,7 +349,7 @@ def record_attempt(problem_id: str, results: dict[str, str] | None = None, resul
         verified: 是否经过批改确认（学生给出了答案或关键结果且你核对过为 true；仅自报为 false）
         skip_reason: 跳过的原因：太难 / 没时间 / 不想做这类 / 已经会了 / 其他
     返回:
-        JSON：每个小问的结果、得分与下次复习时间，各知识点当前掌握度的前后变化
+        JSON：每个小问的结果、得分与下次复习时间（覆盖了原记录的标 updated），各知识点当前掌握度的前后变化
     """
     return dumps(tutor.record_attempt(BANK, LEARN, problem_id, results, result, subq_labels, hints, solution_viewed,
                                       minutes, self_report, error_type, note, verified, skip_reason))

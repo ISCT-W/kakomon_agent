@@ -15,7 +15,7 @@
   - `tutor.py`：出题（主知识点 → 次知识点 → 相邻知识点 → 回炉 → 提前复习）、指定出题、按小问记录作答。
   - `bank.py`：题库查询（知识点别名、紧凑知识点表、相邻知识点、分层找题 `find_problems`（按共同知识点计分，小问压缩成一行）、相似题 `similar_problems`、出题趋势 `exam_trends`、学校/专攻别名与学校组（七帝大）、科目组（数学）、按校汇总的题库概况）；`labels.py`：题号与小问编号规范化。
   - `solutions.py`：解答存档。AI 解答存为 `data/solutions/<题目 ID>.ai.md`（讲解后由 `save_solution` 保存，之后复用），人工解答放 `<题目 ID>.human.md`（直接写文件即可）；取用优先级：题库收录 > 人工 > AI。
-  - `learner.py`：学习记录（每个小问一条作答，含提示次数、用时、自报结果、跳过原因；复习卡片；目标、期间；观察记录；画像版本；报错）。
+  - `learner.py`：学习记录（每个小问一条作答，含提示次数、用时、自报结果、跳过原因；同一次出题 6 小时内再记同一小问会覆盖原记录，复习卡片按作答历史重算；目标、期间；观察记录；画像版本；报错）。
   - `mastery.py`：掌握度（Elo 重放；提示折扣、个性化自报折扣、遗忘衰减）；`review.py`：复习排期（FSRS）；`selector.py`：分层选题。
   - `insights.py`：掌握情况、题型强弱、回避倾向、学习习惯、预测校准、学习数据摘要（画像证据）、学习计划、周期报告。
   - `viewer.py` 题目面板（一次可显示几道题，可附解答）；`report.py` Markdown 周报；`issues.py` 报错维护（list / resolve）。
@@ -24,7 +24,8 @@
   - 测试：`test_learner.py`（合成题库＋固定时间戳的两天模拟，逐项断言）、`smoke_test.py`（经 MCP 协议调用全部工具，用正式题库）。
     测试务必用环境变量把数据指向临时位置：`KAKOMON_LEARNER_DB`、`KAKOMON_PROFILE`、`KAKOMON_VIEWER_DIR`、`KAKOMON_VIEWER_PORT`、`KAKOMON_SOLUTIONS`。
 - `web/`：本地网页界面。`server.py` 是本地服务：只监听 127.0.0.1，每次启动生成令牌并校验 Host；每条消息在学习目录里调用一次 headless Claude Code
-  （`--include-partial-messages` 流式、`--resume` 接续会话、`--append-system-prompt` 说明界面布局），工具结果驱动题目区和右栏；数据接口直接读题库和学习记录。
+  （`--include-partial-messages` 流式；`--append-system-prompt` 附界面说明和技能全文；`--resume` 接续会话，每 4 轮换新会话控制每轮费用，
+  新会话第一条消息前附目标、上次出题条件、最近 3 轮对话和题目区状态），工具结果驱动题目区和右栏；题目区点选的作答由服务直接记录；数据接口直接读题库和学习记录。
   `static/` 是页面（对话｜题目区｜我的学习，学习概况）。启动：`.venv/bin/python -I web/server.py`，打开 http://localhost:18770/；测试用 `--sandbox 目录`（对话会真实调用 Claude Code，花钱）。
 - `data/`：清单、排除名单 `exclude.tsv`、知识点表与别名（`taxonomy/taxonomy_v1.yaml`、`aliases_v1.yaml`，287 个知识点；只追加不改名）、管线缓存 `full/`（`docs.txt` 本次处理的文档、`pages/` 转写、
   `structure/` 拼题、`problems/` 标签、`batch_state.json` 批次与费用、`load_report.json`、`qa/` 验收报告）、题库 `bank.sqlite`、

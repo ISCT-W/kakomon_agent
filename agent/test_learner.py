@@ -284,6 +284,24 @@ def main():
     rep = insights.report(bcon, lcon, 7, at=t)
     assert rep["attempts"] > 0 and rep["by_type"] and rep["habits"]["sessions"] == 2
     print("  周报：", rep["attempts"], rep["results"], "看提示", rep["hinted"], "习惯", rep["habits"])
+
+    print("同一次出题里再记同一小问：覆盖原记录，卡片按作答历史重算")
+    t += timedelta(hours=1)
+    tutor.serve_problem(bcon, lcon, "DS-1", ["(1)"], at=t)
+    sid = learner.last_served(lcon, "DS-1")["id"]
+    rec("DS-1", result="不会", error_type="没思路")
+    t += timedelta(minutes=5)
+    r = rec("DS-1", result="会", hints=1, verified=True)
+    rows = [tuple(x) for x in lcon.execute("SELECT subq_key, result, self_report, hints, error_type, verified FROM attempts "
+                                           "WHERE served_id = ?", (sid,))]
+    assert r["subquestions"][0].get("updated") and [x[1:] for x in rows] == [("会", "不会", 1, "没思路", 1)], rows
+    key = rows[0][0]
+    n = lcon.execute("SELECT COUNT(*) FROM attempts WHERE problem_id = 'DS-1' AND subq_key = ? AND result != '跳过'", (key,)).fetchone()[0]
+    card = lcon.execute("SELECT reps, last_result FROM cards WHERE problem_id = 'DS-1' AND subq_key = ?", (key,)).fetchone()
+    assert tuple(card) == (n, "会"), "卡片按这个小问的全部作答重算"
+    t += timedelta(hours=7)
+    r = rec("DS-1", results={"(1)": "会"})
+    assert not r["subquestions"][0].get("updated"), "超过 6 小时不再覆盖，记为新的一次作答"
     print("全部断言通过")
 
 

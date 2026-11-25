@@ -7,7 +7,7 @@ const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").re
 const OK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2F54C8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const SUBJECTS = [["数学", "数学"], ["la", "线性代数"], ["prob", "概率论"], ["calc", "微积分"], ["计算机", "计算机"]];
 const SUBJECT_NAME = Object.fromEntries(SUBJECTS);
-const S = { running: false, stick: true, plan: null, similar: null, simFor: "", progress: {}, pending: {}, tab: "题目", item: 0,
+const S = { running: false, stick: true, plan: null, similar: null, simFor: "", progress: {}, pending: {}, sent: {}, tab: "题目", item: 0,
   scan: true, ws: { items: [] }, wsStamp: null, subject: "数学" };
 const thread = $("#thread");
 
@@ -139,7 +139,7 @@ function setBusy(busy) {
   document.querySelectorAll(".chips button").forEach(b => { b.disabled = busy; });
 }
 
-async function send(text) {
+async function send(text, extra) {
   text = (text || "").trim();
   if (!text || S.running) return;
   if (location.hash.startsWith("#/overview")) location.hash = "#/";
@@ -152,7 +152,7 @@ async function send(text) {
   renderText(turn);
   toBottom(true);
   try {
-    const resp = await api("/api/chat", { message: text, model: $("#model").value });
+    const resp = await api("/api/chat", Object.assign({ message: text, model: $("#model").value }, extra || {}));
     if (!resp.ok) {
       turn.error = (await resp.json().catch(() => ({}))).error || "出错了（HTTP " + resp.status + "）";
     } else {
@@ -179,8 +179,10 @@ async function send(text) {
   renderText(turn);
   renderAct(turn);
   S.running = false;
+  S.sent = {};
   setBusy(false);
   refreshState();
+  refreshWork();
 }
 
 function handle(turn, ev) {
@@ -199,7 +201,10 @@ function handle(turn, ev) {
     const t = turn.tools.find(x => x.id === ev.id);
     if (t) { t.done = true; t.ok = ev.ok; }
     renderAct(turn);
-    onTool(ev);
+    onTool(ev, (t && t.input) || {});
+  } else if (ev.t === "recorded") {
+    refreshWork();
+    refreshState();
   } else if (ev.t === "done") {
     turn.seconds = ev.seconds;
   } else if (ev.t === "error") {
@@ -208,7 +213,7 @@ function handle(turn, ev) {
   }
 }
 
-function onTool(ev) {
+function onTool(ev, input) {
   const d = ev.data;
   if (ev.name === "exam_trends" && d) { S.plan = d; S.tab = "计划"; renderWork(); }
   if (ev.name === "similar_problems" && d) { S.similar = d.results; S.simFor = d.for || ""; renderWork(); }
@@ -217,7 +222,7 @@ function onTool(ev) {
     refreshWork();
   }
   if (["show_problems", "serve_problem", "next_question", "save_solution"].includes(ev.name) && ev.ok) {
-    refreshWork(ev.name === "save_solution" ? "解答" : "题目");
+    refreshWork(ev.name === "save_solution" || (ev.name === "show_problems" && input.include_solution) ? "解答" : "题目");
   }
   if (["set_goal", "record_attempt", "save_profile", "note_observation"].includes(ev.name)) refreshState();
 }
@@ -319,6 +324,7 @@ function renderWork() {
     if (focus.length) chips.push('<span class="chip blue">本次 ' + esc(focus.length > 3 ? focus[0] + "–" + focus[focus.length - 1] : focus.join("、")) + "</span>");
     head = '<div class="whead"><span class="kicker">' + esc(srcLine(s)) + '</span><div class="wtitle"><h1>' + esc(titleOf(s)) + "</h1>" + chips.join("") + "</div>" +
       tabsHtml(seg + scan) + "</div>";
+    const rec = S.progress[it.problem_id] || {};
     if (S.tab === "题目") {
       const figs = (it.figures || []).map(f => '<figure><img src="/data/' + esc(f.url) + '" alt="' + esc(f.description) + '"><figcaption>' + esc(f.description) + "</figcaption></figure>").join("");
       const pages = S.scan ? (it.page_images || []).map(p => '<figure><img src="/data/' + esc(p) + '" alt="原卷扫描"><figcaption>原卷 · ' +
@@ -329,9 +335,12 @@ function renderWork() {
       const sol = it.solution;
       if (sol) {
         const ai = /AI/.test(sol.label || "");
+        const undone = focus.length || Object.keys(rec).length ? (it.subquestions || []).map(x => x.label).filter(l => !rec[l]) : [];
         body = '<div class="solmeta"><span class="chip ' + (ai ? "warn" : "blue") + '">' + esc(sol.label) + "</span>" +
           (sol.source ? "<span>来源：" + esc(sol.source) + "</span>" : "") + (sol.covers && sol.covers !== "全部" ? "<span>覆盖小问：" + esc(sol.covers) + "</span>" : "") +
-          (sol.verified ? "<span>核对：" + esc(sol.verified) + "</span>" : "") + '</div><div class="md">' + renderMd(sol.text) + "</div>";
+          (sol.verified ? "<span>核对：" + esc(sol.verified) + "</span>" : "") + "</div>" +
+          (undone.length ? '<p class="note">解答也包含你还没做的 ' + esc(undone.length > 6 ? undone.slice(0, 6).join("、") + " 等" : undone.join("、")) +
+            "，想先自己试就别往下看。</p>" : "") + '<div class="md">' + renderMd(sol.text) + "</div>";
       } else {
         body = '<div class="empty" style="min-height:200px"><b>还没有解答</b><span>题库里没有现成解答时，助手会写一份 AI 解答并保存，之后直接复用</span>' +
           '<button type="button" class="btn primary" data-say="' + esc("讲解一下这道题：" + srcLine(s) + " " + titleOf(s) + "（" + it.problem_id + "）") + '">请助手讲解</button></div>';
@@ -342,13 +351,13 @@ function renderWork() {
           (i === 0 ? " primary" : "") + '" data-say="' + esc("我想做这道题：" + r.source + "（" + r.problem_id + "）") + '">做这题</button></div>').join("") + "</div>";
       }
     }
-    const rec = S.progress[it.problem_id] || {};
     if (focus.length) {
       foot = "<span>本题进度</span>" + focus.map(l => {
         if (rec[l]) return '<span class="sq ' + (rec[l] === "会" ? "done" : "bad") + '">' + esc(l) + " " + esc(rec[l]) + "</span>";
+        if (S.sent[l]) return '<span class="sq">' + esc(l) + " " + esc(S.sent[l]) + " · 记录中</span>";
         return '<span class="sq">' + esc(l) + ["会", "部分会", "不会"].map(r => ' <button type="button" data-sq="' + esc(l) + '" data-r="' + r + '" aria-pressed="' +
           (S.pending[l] === r) + '">' + r + "</button>").join("") + "</span>";
-      }).join("") + (focus.every(l => rec[l]) ? "" : '<button type="button" class="btn primary" data-submit ' +
+      }).join("") + (focus.every(l => rec[l] || S.sent[l]) ? "" : '<button type="button" class="btn primary" data-submit ' +
         (Object.keys(S.pending).length ? "" : "disabled") + ">提交反馈</button>");
     } else if (Object.keys(rec).length) {
       foot = "<span>" + (it.solution ? "解答已保存 · " : "") + "本题进度</span>" + Object.entries(rec).map(([l, r]) =>
@@ -372,8 +381,13 @@ $("#work").addEventListener("click", e => {
   else if (b.dataset.sq) { S.pending[b.dataset.sq] = S.pending[b.dataset.sq] === b.dataset.r ? undefined : b.dataset.r;
     if (!S.pending[b.dataset.sq]) delete S.pending[b.dataset.sq]; renderWork(); }
   else if (b.hasAttribute("data-submit")) {
-    const msg = Object.entries(S.pending).map(([l, r]) => l + " " + r).join("，");
-    if (msg) send(msg);
+    const it = items()[S.item], results = Object.assign({}, S.pending);
+    const msg = Object.entries(results).map(([l, r]) => l + " " + r).join("，");
+    if (!msg || !it || S.running) return;
+    S.sent = results;
+    S.pending = {};
+    renderWork();
+    send(msg, { feedback: { problem_id: it.problem_id, results } });
   } else if (b.dataset.say) { e.preventDefault(); send(b.dataset.say); }
 });
 

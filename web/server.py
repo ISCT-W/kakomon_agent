@@ -14,6 +14,7 @@ kakomon 学习界面的本地服务：网页（web/static）、聊天中转（�
 import argparse
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -26,6 +27,7 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC = os.path.join(ROOT, "web", "static")
+SKILL = os.path.join(ROOT, ".claude", "skills", "kakomon-tutor", "SKILL.md")
 sys.path.insert(0, os.path.join(ROOT, "agent"))
 
 LABELS = {"Skill": "加载刷题流程", "get_profile": "读取学习画像", "list_goals": "读取备考目标", "set_goal": "保存目标",
@@ -37,12 +39,23 @@ LABELS = {"Skill": "加载刷题流程", "get_profile": "读取学习画像", "l
           "Bash": "用 Python 核对", "Read": "读取文件"}
 KEEP_DATA = {"exam_trends", "similar_problems", "set_goal", "record_attempt", "serve_problem", "next_question",
              "show_problems", "save_solution"}
-UI_NOTE = ("你在 kakomon 学习界面里运行：界面左边是对话，中间是题目区，右边是学生的目标、掌握度和复习。"
-           "show_problems、serve_problem、next_question、save_solution 的内容会自动显示在中间的题目区（题目原文渲染好、原卷并排、"
-           "完整解答），exam_trends 的统计会显示在题目区的“计划”页。所以：出题或列题时不要在对话里照抄题目原文和勘误"
-           "（这一条优先于 kakomon-tutor 技能第 3 节的“照抄 content_md”），只写出处、本次重点小问、难度和预计用时；"
-           "讲解时对话里只写结论和关键一步；不要贴面板链接，说“在中间的题目区”即可。"
-           "学生也可以在题目区按小问点选“会 / 部分会 / 不会”，提交后会以“3) 会，4) 不会”这样的消息发给你，照常记录。")
+UI_NOTE = """你在 kakomon 学习界面里运行：左边是对话，中间是题目区（“计划 / 题目 / 解答”三页），右边是目标、掌握度和复习。
+- next_question、serve_problem、show_problems 的题目显示在“题目”页（原文已渲染；只有 page_images 不为空时才有原卷并排），解答显示在“解答”页，exam_trends 的统计显示在“计划”页。不要贴面板链接，说“在中间的题目区”即可。
+- 对话要短。出题时不照抄原文和勘误（优先于技能第 3 节的“照抄 content_md”），只写出处、重点小问、难度和用时；常考点只说 2–3 个重点和建议顺序，不复述表格；讲解时每个小问 1–2 句（结论和关键一步），完整推导留在“解答”页。
+- 讲解只讲学生做过或问到的小问；没做的小问先问要不要自己试，不要顺带讲完（“解答”页会提示学生哪些小问还没做）。
+- 学生在题目区点选的结果会以“(1) 会，(2) 不会（已在题目区记录）”发给你：界面已按自报记好，不要重复记录；照常核对、给提示或讲解，结果有变化（批改有误、看了提示或讲解后才会）时对同一小问再调用 record_attempt，会覆盖这条记录。"""
+SESSION_TURNS = 4  # 一个 Claude Code 会话最多接续几轮；之后换新会话并附最近对话（对话越长每轮越贵）
+
+
+def system_note():
+    """
+    每一轮附加的系统提示：界面说明加 kakomon-tutor 技能全文（每轮规则一致，新会话也不用先加载技能）。
+
+    返回:
+        str
+    """
+    skill = re.sub(r"\A---\n.*?\n---\n", "", open(SKILL, encoding="utf-8").read(), flags=re.S).strip()
+    return UI_NOTE + "\n\n以下是 kakomon-tutor 技能全文（已经加载，不用再调用 Skill）：\n\n" + skill
 
 
 class App:
@@ -100,15 +113,50 @@ class App:
 
     def session(self):
         """
-        当前 Claude Code 会话 ID（没有时为空字符串）。
+        当前 Claude Code 会话：ID、模型、已接续的轮数。
 
         返回:
-            str
+            dict（没有会话时为空）
         """
         try:
-            return json.load(open(self.path("session.json"), encoding="utf-8")).get("id", "")
+            return json.load(open(self.path("session.json"), encoding="utf-8"))
         except (OSError, ValueError):
-            return ""
+            return {}
+
+    def recap(self):
+        """
+        新会话附带的接续上下文。自动换会话时：目标、上次按知识点出题的条件、最近 3 轮对话；
+        都附上题目区现在的题与已记录的小问（点“新对话”后只有这一部分）。
+
+        返回:
+            str（没有可接续的内容时为空）
+        """
+        import learner
+        talk = []
+        for e in self.history()[-6:]:
+            text = " ".join((e.get("text") or "").split())
+            talk.append(("学生：" + text[:200]) if e["role"] == "user" else ("你：" + text[:500]))
+        ws, board = workspace(self), []
+        for it in ws["items"]:
+            s, rec = it.get("source") or {}, ws["recorded"].get(it["problem_id"], {})
+            board.append(f"{s.get('university', '')} {s.get('admission_year', '')} {s.get('paper_title') or s.get('problem_label', '')}"
+                         f"（{it['problem_id']}）" + (f"，本次重点 {'、'.join(it['focus'])}" if it.get("focus") else "，展示未出题")
+                         + ("，已记录 " + "，".join(f"{k} {v}" for k, v in rec.items()) if rec else ""))
+        parts = []
+        if talk:
+            head = ["为控制对话长度，这是同一次学习自动换的新会话：接着最近的对话继续，不要提起换会话，也不要重新打招呼。"]
+            g = learner.active_goal(self.learn)
+            if g:
+                head.append(f"学生的目标：{'、'.join(g['universities'])} {' '.join(g['programs'])}，{g['exam_date']} 考试（不必再调用 list_goals）")
+            last = self.learn.execute("SELECT concepts, request FROM served WHERE via = 'next_question' ORDER BY id DESC LIMIT 1").fetchone()
+            if last:
+                req = {k: v for k, v in json.loads(last["request"] or "{}").items() if v}
+                head.append("上次 next_question 的条件：" + json.dumps(dict(concepts=json.loads(last["concepts"] or "[]"), **req),
+                                                                  ensure_ascii=False))
+            parts.append("\n".join(head) + "\n最近的对话：\n" + "\n".join(talk))
+        if board:
+            parts.append("题目区现在显示：\n" + "\n".join(board))
+        return "【界面附带的上下文，不是学生说的话】\n" + "\n\n".join(parts) if parts else ""
 
     def history(self):
         """
@@ -171,15 +219,36 @@ def tool_data(name, text):
     return d
 
 
-def run_chat(app, handler, message, model):
+def record_feedback(app, feedback):
+    """
+    直接记录学生在题目区点选的各小问结果（按自报，verified=false）。
+
+    参数:
+        app: App
+        feedback: {"problem_id": 题目 ID, "results": {小问编号: 会/部分会/不会}}
+    返回:
+        bool，是否记录成功（失败时交给助手照常记录）
+    """
+    import learner
+    import tutor
+    pid, results = feedback.get("problem_id"), feedback.get("results")
+    if not isinstance(pid, str) or not isinstance(results, dict) or not results or \
+            not all(isinstance(k, str) and v in learner.RESULTS for k, v in results.items()):
+        return False
+    return bool(tutor.record_attempt(app.bank, app.learn, pid, results=results).get("recorded"))
+
+
+def run_chat(app, handler, message, model, feedback=None):
     """
     运行一轮对话：调用 headless Claude Code，把流式事件翻译成界面事件（SSE）写回浏览器，结束后写入对话记录。
+    同一会话接续 SESSION_TURNS 轮后换新会话，新会话的第一条消息前面附上 App.recap 的接续上下文。
 
     参数:
         app: App
         handler: 当前请求的处理器（往它的 wfile 写事件）
         message: 学生这一轮说的话
         model: sonnet 或 opus
+        feedback: 题目区点选的结果（见 record_feedback），先直接记录再告诉助手
     """
     alive = [True]
 
@@ -192,18 +261,28 @@ def run_chat(app, handler, message, model):
         except (BrokenPipeError, ConnectionResetError):
             alive[0] = False
 
+    prompt = message
+    if feedback and record_feedback(app, feedback):
+        send({"t": "recorded", "problem_id": feedback["problem_id"]})
+        prompt += "（已在题目区记录）"
+    info = app.session()
+    resume = bool(info.get("id")) and info.get("turns", 0) < SESSION_TURNS
+    recap = "" if resume else app.recap()
+    if recap:
+        prompt = recap + "\n\n【学生这一轮说】\n" + prompt
     cmd = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-           "--model", model, "--mcp-config", app.mcp_config, "--strict-mcp-config", "--append-system-prompt", UI_NOTE,
+           "--model", model, "--mcp-config", app.mcp_config, "--strict-mcp-config",
+           "--append-system-prompt", system_note(),
            "--allowedTools", "mcp__kakomon", "Skill", "Read", "Bash(.venv/bin/python -I -c:*)"]
-    if app.session():
-        cmd += ["--resume", app.session()]
+    if resume:
+        cmd += ["--resume", info["id"]]
     app.append({"role": "user", "text": message, "ts": datetime.now().strftime("%Y-%m-%d %H:%M")})
     started, texts, tools, views, current = time.time(), [], [], {}, None
     err_log = open(app.path("claude-stderr.log"), "w", encoding="utf-8")
     try:
         app.proc = subprocess.Popen(cmd, cwd=app.study, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                     stderr=err_log, text=True, bufsize=1)
-        app.proc.stdin.write(message)
+        app.proc.stdin.write(prompt)
         app.proc.stdin.close()
     except FileNotFoundError:
         err_log.close()
@@ -220,7 +299,8 @@ def run_chat(app, handler, message, model):
         kind = ev.get("type")
         if kind == "system" and ev.get("subtype") == "init":
             with open(app.path("session.json"), "w", encoding="utf-8") as f:
-                json.dump({"id": ev.get("session_id", ""), "model": ev.get("model", "")}, f)
+                json.dump({"id": ev.get("session_id", ""), "model": ev.get("model", ""),
+                           "turns": (info.get("turns", 0) if resume else 0) + 1}, f, ensure_ascii=False)
         elif kind == "stream_event":
             e = ev.get("event", {})
             if e.get("type") == "content_block_start":
@@ -538,7 +618,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
-                run_chat(self.app, self, message, "opus" if body.get("model") == "opus" else "sonnet")
+                run_chat(self.app, self, message, "opus" if body.get("model") == "opus" else "sonnet",
+                         body.get("feedback") if isinstance(body.get("feedback"), dict) else None)
             finally:
                 self.app.lock.release()
             return

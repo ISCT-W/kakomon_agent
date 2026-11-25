@@ -189,7 +189,7 @@ def record_attempt(bcon, lcon, problem_id, results=None, result="", subq_labels=
     rows = bank.subq_rows(detail, list(mapping), SECONDARY_WEIGHT)
     for r in rows:
         res = mapping[r["key"]]
-        r.update(result=res, score=mastery.attempt_score(res, hints, solution_viewed), self_report=self_report or res,
+        r.update(result=res, score=mastery.attempt_score(res, hints, solution_viewed), self_report=self_report,
                  hints=hints, solution_viewed=solution_viewed,
                  minutes=round(total / len(rows), 1) if total is not None else None, minutes_source=source,
                  error_type=error_type if res in ("不会", "部分会") else "", note=note, verified=verified,
@@ -208,6 +208,7 @@ def record_attempt(bcon, lcon, problem_id, results=None, result="", subq_labels=
                 "level": mastery.summary(after, c, at)["level"]} for c, w in sorted(weights.items(), key=lambda x: -x[1])]
     by_key = {r["key"]: r for r in rows}
     return {"recorded": True, "minutes": total, "minutes_source": source,
-            "subquestions": [{"label": x["label"], "result": by_key[x["key"]]["result"],
-                              "score": by_key[x["key"]]["score"], "next_review": x["next_review"]} for x in recs],
+            "subquestions": [dict({"label": x["label"], "result": by_key[x["key"]]["result"],
+                                   "score": by_key[x["key"]]["score"], "next_review": x["next_review"]},
+                                  **({"updated": True} if x["amended"] else {})) for x in recs],
             "mastery_changes": changes}
