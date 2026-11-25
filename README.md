@@ -1,5 +1,7 @@
 # kakomon_agent
 
+**中文** | [English](README.en.md) | [日本語](README.ja.md)
+
 日本大学院入试（情報系）过去问学习助手。用 Claude 把你手上的过去问（PDF、照片）整理成按知识点标注的题库，再在 [Claude Code](https://claude.com/claude-code) 里以 MCP 服务＋skill 的形式刷题。
 
 > 本仓库只有代码，不含任何过去问或由过去问生成的数据（著作权属于各大学）。题库需要用你自己的过去问生成。
