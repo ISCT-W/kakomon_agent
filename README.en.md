@@ -46,6 +46,8 @@ A study assistant for Japanese graduate school entrance exams (information scien
    ```
 
    Then run the stages `transcribe` → `structure` → `tag`, each with `submit --stage ... --docs all`, `wait` and `collect`; finish with `load` to build the bank and `qa` for a review report. See the docstring at the top of `pipeline/run_full.py`. Reference cost: about 600 papers (about 7,000 pages) cost about $80 in total (Sonnet, Batch API).
+
+   Past exams that are already text (one Markdown file per problem, e.g. [The Kai Project](https://github.com/Myyura/the_kai_project)) can skip transcription and structuring: put them in `kakomon/<folder>/` with an `index.csv` (columns `path, university, graduate_school, program, admission_year, exam_held, paper_title`), run `run_full.py markdown`, then only the `tag` stage and `load`. About $0.008 per problem.
 5. Start studying, either way:
    - **Web UI**: chat on the left, the problem (rendered formulas, original scan side by side) and solution in the middle, mastery, learning tendencies and due reviews on the right, plus an overview page.
 

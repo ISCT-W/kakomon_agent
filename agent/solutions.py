@@ -107,7 +107,7 @@ def available(problem_id, bank_solution=""):
 
 def best(problem_id, bank_solution="", bank_source=""):
     """
-    按优先顺序取一份解答：题库收录 > 人工 > AI。
+    按优先顺序取一份解答：题库收录 > 人工 > AI；题库解答来自 Markdown 社区来源时排在人工之后。
 
     参数:
         problem_id: 题目 ID
@@ -116,6 +116,11 @@ def best(problem_id, bank_solution="", bank_source=""):
     返回:
         dict（同 read，题库解答另有 source）；都没有时返回 None
     """
-    if bank_solution:
+    community = bank_source.endswith(".md")
+    if bank_solution and not community:
         return {"kind": "bank", "label": LABELS["bank"], "text": bank_solution, "source": bank_source}
-    return read(problem_id, "human") or read(problem_id, "ai")
+    human = read(problem_id, "human")
+    if human or not bank_solution:
+        return human or read(problem_id, "ai")
+    return {"kind": "bank", "label": f"社区解答（{bank_source.split('/')[0]}，未经人工确认）",
+            "text": bank_solution, "source": bank_source}

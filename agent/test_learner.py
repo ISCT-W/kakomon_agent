@@ -247,6 +247,8 @@ def main():
         f.write("人工解答")
     assert solutions.available("DS-1") == ["human", "ai"] and solutions.best("DS-1")["kind"] == "human", "人工优先于 AI"
     assert solutions.best("DS-1", "题库解答", "x.pdf")["kind"] == "bank", "题库解答优先"
+    assert solutions.best("DS-1", "社区解答", "src/a.md")["kind"] == "human", "社区解答排在人工之后"
+    assert solutions.best("DS-2", "社区解答", "src/a.md")["label"].startswith("社区解答"), "没有人工解答时用社区解答"
     assert viewer.item(bank.problem_detail(bcon, "DS-1"), solution=solutions.best("DS-1"))["solution"]["label"] == "人工解答"
 
     print("掌握度衰减、题型统计、学习数据摘要与画像")

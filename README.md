@@ -46,6 +46,8 @@
    ```
 
    之后按 `transcribe` → `structure` → `tag` 的顺序，每个阶段依次 `submit --stage ... --docs all`、`wait`、`collect`，最后 `load` 入库、`qa` 出验收报告。各命令见 `pipeline/run_full.py` 开头的说明。参考花费：约 600 份试卷（约 7,000 页）全量处理约 $80（Sonnet，Batch API）。
+
+   已经是文字的过去问（一题一个 Markdown，如 [The Kai Project](https://github.com/Myyura/the_kai_project)）可以跳过转写和拼题：放进 `kakomon/<目录>/`，目录里写 `index.csv`（列：`path, university, graduate_school, program, admission_year, exam_held, paper_title`），运行 `run_full.py markdown`，再只跑 `tag` 阶段和 `load`。每题约 $0.008。
 5. 开始学习，两种方式任选：
    - **网页界面**：左边对话，中间是题目（公式渲染、原卷并排）和解答，右边是掌握度、学习倾向和到期复习，另有学习概况页。
 

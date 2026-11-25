@@ -6,6 +6,7 @@
 
 用法:
     python -I pipeline/run_full.py render [--docs ...] [--workers 8]   # 并行判断有内容的页、渲染页面图像
+    python -I pipeline/run_full.py markdown     # 把 kakomon/ 下的 Markdown 来源写成清单与转写、拼题缓存（不调用 API）
     python -I pipeline/run_full.py estimate [--docs ...]
     python -I pipeline/run_full.py submit --stage transcribe|structure|tag [--docs ...] [--budget 125] [--sync]
     python -I pipeline/run_full.py wait         # 等待已提交的批次结束
@@ -29,6 +30,7 @@ import batch  # noqa: E402
 import common  # noqa: E402
 import db  # noqa: E402
 import link  # noqa: E402
+import markdown_source  # noqa: E402
 import tagging  # noqa: E402
 import transcribe  # noqa: E402
 from build_manifest import FOLDER_INFO, doc_pages, list_documents  # noqa: E402
@@ -93,6 +95,11 @@ def manifest_rows():
             r["admission_year"] = int(r["admission_year"] or 0)
             r["program_folder"] = FOLDER_INFO.get(r["rel_path"].split("/")[0], ("", "", ""))[2]
             rows[r["rel_path"]] = r
+    if os.path.exists(markdown_source.MANIFEST):
+        with open(markdown_source.MANIFEST, encoding="utf-8-sig") as f:
+            for r in csv.DictReader(f):
+                r["admission_year"] = int(r["admission_year"] or 0)
+                rows[r["rel_path"]] = r
     return rows
 
 
@@ -139,6 +146,8 @@ def content_pages(rel):
     返回:
         list[dict]，含 page（从 1 开始）、path、index
     """
+    if markdown_source.is_markdown(rel):
+        return [{"page": 1, "path": os.path.join(common.KAKOMON_DIR, rel), "index": 0}]
     doc = next(d for d in list_documents(common.KAKOMON_DIR) if d["rel_path"] == rel)
     pages, _ = doc_pages(doc)
     cache_path = os.path.join(PAGES_DIR, manifest_rows()[rel]["doc_id"], "pages.json")
@@ -535,7 +544,7 @@ def cmd_load(rows, concepts, force):
     rels = processed_docs(rows)
     built, link_rep, checks, waiting = assemble_docs(rels, rows)
     for rel in rels:
-        if rows[rel]["doc_id"] in built:
+        if rows[rel]["doc_id"] in built and not markdown_source.is_markdown(rel):
             for pg in content_pages(rel):
                 page_image(rows[rel]["doc_id"], pg)
     tags, untagged, invalid = {}, [], {}
@@ -552,7 +561,8 @@ def cmd_load(rows, concepts, force):
     by_id = {rows[r]["doc_id"]: rows[r] for r in rels}
     all_problems = [p for d in built.values() for p in d["problems"]]
     pairs = link.near_duplicates(all_problems)
-    kinds = {p["problem_id"]: by_id[doc_id]["document_kind"] for doc_id, d in built.items() for p in d["problems"]}
+    kinds = {p["problem_id"]: "markdown" if by_id[doc_id].get("kind") == "markdown" else by_id[doc_id]["document_kind"]
+             for doc_id, d in built.items() for p in d["problems"]}
     duplicates = link.duplicate_map(all_problems, pairs, kinds)
     stats = db.build_bank(BANK, built, by_id, tags, concepts, common.DATA_DIR, LEARNER, force, duplicates)
     report = {
@@ -596,7 +606,7 @@ def main():
     命令行入口。
     """
     ap = argparse.ArgumentParser()
-    ap.add_argument("command", choices=["render", "estimate", "submit", "wait", "collect", "load", "qa", "status"])
+    ap.add_argument("command", choices=["render", "markdown", "estimate", "submit", "wait", "collect", "load", "qa", "status"])
     ap.add_argument("--stage", choices=["transcribe", "structure", "tag"])
     ap.add_argument("--docs", default="")
     ap.add_argument("--budget", type=float, default=125.0)
@@ -615,6 +625,9 @@ def main():
     if args.command == "qa":
         import qa_report
         print(qa_report.build(args.out or QA_DIR, BANK, LOAD_REPORT, STATE_PATH, PAGES_DIR))
+        return
+    if args.command == "markdown":
+        print(json.dumps(markdown_source.sync(PAGES_DIR, STRUCT_DIR), ensure_ascii=False, indent=1))
         return
     if args.command == "load":
         cmd_load(rows, concepts, args.force)

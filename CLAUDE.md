@@ -9,8 +9,8 @@
 - `pipeline/`：数据管线（Sonnet 5.5：转写 → 拼题 → 挂接 → 打标签 → 入库，默认走 Batch API）。
   - `build_manifest.py` + `normalize_manifest.py`：试卷清单（`data/manifest.csv`）；`find_duplicates.py` + `plan_cleanup.py`：新增试卷时查重、列出要移除的文件（只列清单，删除用 trash）。
   - `transcribe.py`：单页转写（prompt v3，含页面年度与科目）；`assemble.py`：拼题（大文档分块、稳定题目 ID、解答/勘误条目）；
-    `link.py`：跨文档挂接解答与勘误、题目查重；`tagging.py`：打标签（知识点、题型、难度、解法要点、小问依赖）；`db.py`：题库表结构与整库重建。
-  - `run_full.py`：主脚本（estimate / submit / wait / collect / load / qa / status），`batch.py`：Batch 提交与取回、预算上限；`qa_report.py`：验收报告。
+    `link.py`：跨文档挂接解答与勘误、题目查重；`markdown_source.py`：Markdown 入口（一题一个 Markdown 的来源目录带 `index.csv`，本地生成转写与拼题缓存，只需打标签）；`tagging.py`：打标签（知识点、题型、难度、解法要点、小问依赖）；`db.py`：题库表结构与整库重建。
+  - `run_full.py`：主脚本（markdown / estimate / submit / wait / collect / load / qa / status），`batch.py`：Batch 提交与取回、预算上限；`qa_report.py`：验收报告。
 - `agent/`：学习助手 MCP 服务（`server.py`，23 个工具，薄封装）。
   - `tutor.py`：出题（主知识点 → 次知识点 → 相邻知识点 → 回炉 → 提前复习）、指定出题、按小问记录作答。
   - `bank.py`：题库查询（知识点别名、紧凑知识点表、相邻知识点、分层找题 `find_problems`（按共同知识点计分，小问压缩成一行）、相似题 `similar_problems`、出题趋势 `exam_trends`、学校/专攻别名与学校组（七帝大）、科目组（数学）、按校汇总的题库概况）；`labels.py`：题号与小问编号规范化。
@@ -40,6 +40,7 @@
 - API 密钥在 `.env` 的 `claude-key`（变量名带连字符，由 `pipeline/common.py` 解析）；请求参数统一由 `common.request_params` 组装（同步与 Batch 一致），同步调用走 `common.call_params`。
 - 花钱的步骤（转写、拼题、打标签、对话回归检查）必须先得到用户同意；`run_full.py submit` 用 `--budget` 设上限。
 - 管线流程：`submit --stage transcribe` → `wait` → `collect` → `submit --stage structure` → `wait` → `collect` → `submit --stage tag` → `wait` → `collect` → `load` → `qa`。
+  Markdown 来源：`markdown` → `submit --stage tag` → `wait` → `collect` → `load`（kakomon/the_kai_project 来自 The Kai Project，AGPL-3.0，只在本地）。
   Batch 里失败或被拒的少数请求用 `submit --stage ... --sync` 补跑。缓存可断点续跑；题库随处理进度累积，`load` 不调用 API，新机器上可直接用缓存重建题库。
 - 重复题：入库时按正文相似度（≥0.8）把同一道题并成组，保留最早的正式试卷题，其余标 `duplicate_of`，出题、找题和统计都跳过（`also_in` 列出它还出现在哪里）。
 - 题目 ID = 文档 ID ＋ 规范化题号（合订本再加年度）；学习记录引用的题目或小问在重建题库时消失会停止入库（`load --force` 才替换）。

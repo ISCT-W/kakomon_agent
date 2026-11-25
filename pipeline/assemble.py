@@ -524,7 +524,7 @@ def build_doc(doc_row, rows, info, structure):
 
 def crop_figures(problem, page_image_path, out_dir, pad=20):
     """
-    按插图边界框从页面图像裁剪插图并保存，路径写回 figures。
+    按插图边界框从页面图像裁剪插图并保存，路径写回 figures；Markdown 来源的插图（带 src）直接转存为 PNG。
 
     参数:
         problem: build_doc 产出的大题
@@ -537,6 +537,12 @@ def crop_figures(problem, page_image_path, out_dir, pad=20):
     for k, f in enumerate(problem["figures"], 1):
         bbox = f.get("bbox") or []
         f["path"] = ""
+        if f.get("src"):
+            import markdown_source
+            path = os.path.join(out_dir, f"{problem['problem_id']}_f{k}.png")
+            if os.path.exists(path) or markdown_source.copy_figure(f["src"], path):
+                f["path"] = path
+            continue
         if len(bbox) != 4 or not os.path.exists(page_image_path(f["page"])):
             continue
         img = Image.open(page_image_path(f["page"]))

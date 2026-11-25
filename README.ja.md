@@ -46,6 +46,8 @@
    ```
 
    続いて `transcribe` → `structure` → `tag` の順に、各段階で `submit --stage ... --docs all`、`wait`、`collect` を実行し、最後に `load` で取り込み、`qa` で検収レポートを出します。各コマンドは `pipeline/run_full.py` 冒頭の説明を参照してください。費用の目安：約 600 試験（約 7,000 ページ）の全量処理で約 80 ドル（Sonnet、Batch API）。
+
+   すでにテキストになっている過去問（1 問 1 ファイルの Markdown、例：[The Kai Project](https://github.com/Myyura/the_kai_project)）は転写と問題の組み立てを省けます。`kakomon/<フォルダ>/` に置いて `index.csv`（列：`path, university, graduate_school, program, admission_year, exam_held, paper_title`）を書き、`run_full.py markdown` を実行してから `tag` 段階と `load` だけを行います。1 問あたり約 0.008 ドル。
 5. 学習を始めます。次のどちらでも使えます：
    - **Web 画面**：左に対話、中央に問題（数式を表示、原本を並べて表示）と解答、右に習熟度・学習の傾向・復習予定があり、学習概要ページもあります。
 
