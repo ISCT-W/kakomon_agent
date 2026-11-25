@@ -23,6 +23,9 @@
   - `dialogue_check.py`：对话回归检查（临时学习目录里用 headless Claude Code 跑固定的三轮对话，检查中文回答、工具报错与超长、Bash 用法、新工具是否调用）。会花钱，运行前确认。
   - 测试：`test_learner.py`（合成题库＋固定时间戳的两天模拟，逐项断言）、`smoke_test.py`（经 MCP 协议调用全部工具，用正式题库）。
     测试务必用环境变量把数据指向临时位置：`KAKOMON_LEARNER_DB`、`KAKOMON_PROFILE`、`KAKOMON_VIEWER_DIR`、`KAKOMON_VIEWER_PORT`、`KAKOMON_SOLUTIONS`。
+- `web/`：本地网页界面。`server.py` 是本地服务：只监听 127.0.0.1，每次启动生成令牌并校验 Host；每条消息在学习目录里调用一次 headless Claude Code
+  （`--include-partial-messages` 流式、`--resume` 接续会话、`--append-system-prompt` 说明界面布局），工具结果驱动题目区和右栏；数据接口直接读题库和学习记录。
+  `static/` 是页面（对话｜题目区｜我的学习，学习概况）。启动：`.venv/bin/python -I web/server.py`，打开 http://localhost:18770/；测试用 `--sandbox 目录`（对话会真实调用 Claude Code，花钱）。
 - `data/`：清单、排除名单 `exclude.tsv`、知识点表与别名（`taxonomy/taxonomy_v1.yaml`、`aliases_v1.yaml`，287 个知识点；只追加不改名）、管线缓存 `full/`（`docs.txt` 本次处理的文档、`pages/` 转写、
   `structure/` 拼题、`problems/` 标签、`batch_state.json` 批次与费用、`load_report.json`、`qa/` 验收报告）、题库 `bank.sqlite`、
   学习记录 `learner.sqlite`、画像 `learner_profile.md`、解答存档 `solutions/`、题目面板 `viewer/`。
@@ -41,7 +44,7 @@
 - 重复题：入库时按正文相似度（≥0.8）把同一道题并成组，保留最早的正式试卷题，其余标 `duplicate_of`，出题、找题和统计都跳过（`also_in` 列出它还出现在哪里）。
 - 题目 ID = 文档 ID ＋ 规范化题号（合订本再加年度）；学习记录引用的题目或小问在重建题库时消失会停止入库（`load --force` 才替换）。
 - MCP 服务走 stdio，服务代码不能向标准输出打印任何内容。工具结果要控制长度（找题等列表结果不超过约 3 万字），太长时 Claude Code 会把结果存成文件而不直接给模型。
-- 题目面板：MCP 服务启动时在 127.0.0.1:18766 提供 `data/`，面板地址 `http://localhost:18766/viewer/`。
+- 题目面板：MCP 服务启动时在 127.0.0.1:18766 提供 `data/`，面板地址 `http://localhost:18766/viewer/`；网页界面默认 18770，它启动的 MCP 服务把面板端口设成同一个端口（不另起面板）。
 
 ## TODO
 

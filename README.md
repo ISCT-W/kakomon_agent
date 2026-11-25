@@ -20,6 +20,7 @@
 | `pipeline/` | 数据管线：逐页转写 → 拼题 → 挂接解答与勘误 → 打标签 → 入库（默认走 Message Batches API） |
 | `agent/` | MCP 服务（23 个工具）与学习逻辑、测试 |
 | `.claude/skills/kakomon-tutor/` | 刷题流程（skill） |
+| `web/` | 本地网页界面：对话、题目区（题目 / 原卷 / 解答）、我的学习，另有学习概况页 |
 | `data/taxonomy/` | 知识点表与别名（287 个知识点） |
 | `data/viewer/` | 题目面板页面 |
 
@@ -43,13 +44,22 @@
    ```
 
    之后按 `transcribe` → `structure` → `tag` 的顺序，每个阶段依次 `submit --stage ... --docs all`、`wait`、`collect`，最后 `load` 入库、`qa` 出验收报告。各命令见 `pipeline/run_full.py` 开头的说明。参考花费：约 600 份试卷（约 7,000 页）全量处理约 $80（Sonnet，Batch API）。
-5. 建一个学习用目录并开始（默认用 Sonnet，上下文更小）：
+5. 开始学习，两种方式任选：
+   - **网页界面**：左边对话，中间是题目（公式渲染、原卷并排）和解答，右边是掌握度、学习倾向和到期复习，另有学习概况页。
 
-   ```bash
-   .venv/bin/python -I agent/setup_study.py ~/kakomon-study
-   ```
+     ```bash
+     .venv/bin/python -I web/server.py
+     ```
 
-   然后 `cd ~/kakomon-study && claude`，说“我想练习线性代数的特征值”之类即可。题目面板：<http://localhost:18766/viewer/>。
+     打开 <http://localhost:18770/>。每条消息由本机的 Claude Code 在后台处理（需要已安装并登录），默认 Sonnet，可在对话框上方换成 Opus。
+     第一次启动会自动建学习目录 `~/kakomon-study`。想先试用、不碰正式学习记录时加 `--sandbox ~/kakomon-try`。
+   - **Claude Code 终端**：
+
+     ```bash
+     .venv/bin/python -I agent/setup_study.py ~/kakomon-study
+     ```
+
+     然后 `cd ~/kakomon-study && claude`，说“我想练习线性代数的特征值”之类即可。题目面板：<http://localhost:18766/viewer/>。
 
 ## 测试
 
