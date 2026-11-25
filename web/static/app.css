@@ -157,5 +157,7 @@ table.trends td.n { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 900px) {
   .chat, .work, .rail { height: auto; max-width: none; }
-  .chat { min-height: 520px; }
+  .work { order: -1; min-height: 0; max-height: 64vh; }
+  .work .empty { min-height: 120px; }
+  .chat { min-height: 420px; height: 76vh; }
 }

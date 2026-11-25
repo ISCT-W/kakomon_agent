@@ -103,6 +103,18 @@ def finish(out):
     return dumps({k: v for k, v in out.items() if not k.startswith("_")})
 
 
+def school_note(university):
+    """
+    学校参数在题库里对不上时并入结果的提示：university_not_found 与候选校名 university_candidates。
+
+    参数:
+        university: 工具收到的学校参数（字符串或列表）
+    返回:
+        dict，对得上或没给学校时为空
+    """
+    return bank.university_note(BANK, bank.resolve_universities(university, BANK)) if university else {}
+
+
 @server.tool()
 def bank_overview(university: str = "") -> str:
     """
@@ -114,7 +126,7 @@ def bank_overview(university: str = "") -> str:
         university: 只看某校（可用简称、英文名、新校名；多所学校用逗号或加号连接，也可写学校组，如“七帝大”）；
                     留空看全部学校的汇总
     """
-    return dumps(bank.overview(BANK, university), compact=True)
+    return dumps(dict(bank.overview(BANK, university), **school_note(university)), compact=True)
 
 
 @server.tool()
@@ -178,7 +190,7 @@ def find_problems(concepts: list[str] | None = None, keywords: list[str] | None 
     limit = max(1, min(limit or 20, MAX_FIND_LIMIT))
     rows, total = bank.find_problems(BANK, concepts or [], keywords or [], university, program, question_type,
                                      difficulty_min, difficulty_max, limit, brief)
-    out = {"total": total, "shown": len(rows), "results": annotate(rows)}
+    out = dict({"total": total, "shown": len(rows), "results": annotate(rows)}, **school_note(university))
     if not total:
         out["hint"] = "换成日文术语或同义词、减少关键词、去掉学校/专攻/题型限制，或换相邻的知识点"
     return fit(out)
@@ -206,7 +218,7 @@ def similar_problems(problem_id: str, subq_labels: list[str] | None = None, univ
     history = learner.problem_history(LEARN)
     rows = [r for r in rows if not (history.get(r["problem_id"], {}).get("last") == "会"
                                     and not history[r["problem_id"]]["bad_keys"])][:limit]
-    return fit({"total": total, "shown": len(rows), "results": annotate(rows)})
+    return fit(dict({"total": total, "shown": len(rows), "results": annotate(rows)}, **school_note(university)))
 
 
 @server.tool()
@@ -218,7 +230,7 @@ def next_question(concepts: list[str], university: str = "", program: str = "", 
 
     参数:
         concepts: 知识点 ID 或前缀列表，如 ["la.eigen"]（整个单元）、["calc.mint.change"]（单个知识点）、["la"]（整个科目）
-        university: 只出某校的题（可用简称、英文名，如 京大、东大、东科大/东工大、Science Tokyo）；多所学校用逗号或加号连接，
+        university: 只出某校的题（可用简称、中文或英文校名，如 京大、东大、东科大/东工大、广岛大学、Science Tokyo）；多所学校用逗号或加号连接，
                     也可写学校组（七帝大/旧帝大 = 7 所旧帝国大学），如“七帝大+东科大”；留空不限
         program: 专攻关键词（中文、英文、日文均可，如“计算机”“通信情報”），留空不限；返回 matched_programs 供确认
         mode: adaptive（默认）：先到期复习，再挑预测做对概率约 70% 的新题，刚接触的知识点从最简单的开始；
@@ -231,7 +243,7 @@ def next_question(concepts: list[str], university: str = "", program: str = "", 
         题目面板地址；没有合适的题时 found=false 并说明原因
     """
     out = tutor.next_question(BANK, LEARN, concepts, university, program, mode, allow_seen, expand)
-    return finish(out)
+    return finish(dict(out, **school_note(university)))
 
 
 @server.tool()
@@ -398,11 +410,11 @@ def set_goal(exam_date: str, universities: list[str], programs: list[str] | None
     """
     if not learner.exam_day(exam_date):
         return dumps({"saved": False, "error": "考试日期写成 YYYY-MM-DD，只知道月份时写 YYYY-MM"})
-    unis = bank.resolve_universities(universities)
+    unis = bank.resolve_universities(universities, BANK)
     gid = learner.set_goal(LEARN, exam_date, unis, programs or [], note)
     progs = sorted({p for k in programs or [] for u in unis or [""] for p in bank.matched_programs(BANK, k, u)})
-    return dumps({"saved": True, "id": gid, "universities": unis, "programs": programs or [],
-                  "matched_programs": progs, "exam_date": exam_date})
+    return dumps(dict({"saved": True, "id": gid, "universities": unis, "programs": programs or [],
+                       "matched_programs": progs, "exam_date": exam_date}, **bank.university_note(BANK, unis)))
 
 
 @server.tool()
@@ -447,9 +459,9 @@ def study_plan(university: str = "", program: str = "", subjects: list[str] | No
         subjects: 只看这些科目：科目 ID（la、calc、prob……）、中文名，或科目组“数学”“计算机”
         top_n: 返回前几个知识点
     """
-    unis = bank.resolve_universities(university) if university else None
+    unis = bank.resolve_universities(university, BANK) if university else None
     progs = [program] if program else None
-    return dumps(insights.study_plan(BANK, LEARN, unis, progs, top_n, subjects=subjects))
+    return dumps(dict(insights.study_plan(BANK, LEARN, unis, progs, top_n, subjects=subjects), **school_note(university)))
 
 
 @server.tool()
@@ -464,7 +476,7 @@ def exam_trends(university: str = "", program: str = "", subjects: list[str] | N
         subjects: 科目 ID（la、calc、prob……）、中文名，或科目组“数学”“计算机”，留空不限
         top_n: 返回前几个知识点
     """
-    return dumps(bank.exam_trends(BANK, university, program, subjects or [], top_n), compact=True)
+    return dumps(dict(bank.exam_trends(BANK, university, program, subjects or [], top_n), **school_note(university)), compact=True)
 
 
 @server.tool()

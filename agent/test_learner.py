@@ -216,6 +216,10 @@ def main():
     assert "la.eigen.diag" in bank.neighbors(bcon, ["la.eigen.compute"])
     assert bank.resolve_university("Science Tokyo") == "東京工業大学" and "コンピュータ" in bank.resolve_program("计算机")
     assert bank.resolve_universities("七帝大+东科大") == bank.SEVEN_IMPERIAL + ["東京工業大学"]
+    assert bank.fold("廣島大學") == bank.fold("广岛大学") == "広島大学", "简体、繁体字换成日文字形"
+    assert bank.resolve_universities("东京大學+京都", bcon) == ["東京大学", "京都大学"], "中文校名、省略“大学”"
+    note = bank.university_note(bcon, bank.resolve_universities("千叶大学", bcon))
+    assert note["university_not_found"] == ["千叶大学"] and note["university_candidates"], "查不到的学校附候选校名"
     rows, total = bank.find_problems(bcon, concepts=["la"], university="七帝大")
     assert {r["source"]["university"] for r in rows} == {"京都大学", "東京大学"}, "学校组过滤（不含筑波）"
     assert {r["university"] for r in bank.candidates(bcon, ["la"], "京大,筑波")} == {"京都大学", "筑波大学"}
@@ -302,6 +306,13 @@ def main():
     t += timedelta(hours=7)
     r = rec("DS-1", results={"(1)": "会"})
     assert not r["subquestions"][0].get("updated"), "超过 6 小时不再覆盖，记为新的一次作答"
+
+    print("做对（没看完整讲解）不降低掌握度")
+    row = {"ts": "2026-11-12 10:00:00", "result": "会", "score": mastery.attempt_score("会", 1), "solution_viewed": 0,
+           "difficulty": 1, "concept_weights": json.dumps({"x": 1.0}), "verified": 1, "self_report": "会"}
+    assert mastery.replay([row])["x"]["theta"] == 0, "看 1 次提示做对难度 1 的小问：不加分也不扣分"
+    viewed = dict(row, solution_viewed=1, score=mastery.attempt_score("会", 1, True))
+    assert mastery.replay([viewed])["x"]["theta"] < 0, "看完整讲解后才会的照常按得分计算"
     print("全部断言通过")
 
 

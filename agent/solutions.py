@@ -15,6 +15,7 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 DEFAULT_DIR = os.path.join(DATA_DIR, "solutions")
 LABELS = {"bank": "题库收录的解答", "human": "人工解答", "ai": "AI 解答（未经人工确认）"}
 ORDER = ("bank", "human", "ai")
+COMMUNITY = {"the_kai_project": "The Kai Project"}  # Markdown 社区来源的目录 -> 显示名
 
 
 def folder():
@@ -105,6 +106,21 @@ def available(problem_id, bank_solution=""):
     return [k for k in ORDER if (bank_solution if k == "bank" else os.path.exists(path_of(problem_id, k)))]
 
 
+def source_name(path):
+    """
+    题库解答来源文件的显示名：社区来源写项目名，其余去掉扩展名、目录之间用“ · ”连接。
+
+    参数:
+        path: 来源文件的相对路径（如 the_kai_project/docs/....md）
+    返回:
+        str
+    """
+    if path.endswith(".md"):
+        top = path.split("/")[0]
+        return COMMUNITY.get(top, top)
+    return os.path.splitext(path)[0].replace("/", " · ")
+
+
 def best(problem_id, bank_solution="", bank_source=""):
     """
     按优先顺序取一份解答：题库收录 > 人工 > AI；题库解答来自 Markdown 社区来源时排在人工之后。
@@ -114,13 +130,12 @@ def best(problem_id, bank_solution="", bank_source=""):
         bank_solution: 题库里的解答正文
         bank_source: 题库解答的来源文件
     返回:
-        dict（同 read，题库解答另有 source）；都没有时返回 None
+        dict（同 read，题库解答另有来源显示名 source）；都没有时返回 None
     """
     community = bank_source.endswith(".md")
     if bank_solution and not community:
-        return {"kind": "bank", "label": LABELS["bank"], "text": bank_solution, "source": bank_source}
+        return {"kind": "bank", "label": LABELS["bank"], "text": bank_solution, "source": source_name(bank_source)}
     human = read(problem_id, "human")
     if human or not bank_solution:
         return human or read(problem_id, "ai")
-    return {"kind": "bank", "label": f"社区解答（{bank_source.split('/')[0]}，未经人工确认）",
-            "text": bank_solution, "source": bank_source}
+    return {"kind": "bank", "label": "社区解答（未经人工确认）", "text": bank_solution, "source": source_name(bank_source)}

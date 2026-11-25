@@ -378,7 +378,7 @@ def concept_frequency(bank_con, universities=None, programs=None, subjects=None)
         WHERE sc.role = 'primary' AND (p.duplicate_of IS NULL OR p.duplicate_of = '')""").fetchall()
     sids = bank.resolve_subjects(bank_con, subjects or [])
     rows = [r for r in rows if bank.in_subjects(r["concept_id"], sids)]
-    unis = bank.resolve_universities(universities or [])
+    unis = bank.resolve_universities(universities or [], bank_con)
     parts = [x for p in (programs or []) for x in bank.resolve_program(p)]
 
     def by_uni(r):

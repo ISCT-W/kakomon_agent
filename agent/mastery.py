@@ -5,7 +5,7 @@
 - 每条作答：theta += K(n) * w * m * (s - P)
   s：得分（会 1、部分会 0.5、不会 0；看提示后才会打折，看过完整讲解最多 0.25）；
   w：主知识点 1.0、次知识点 0.4；m：未经批改的自报“会”打折（折扣按该学生自报与批改的偏差个性化）；
-  K 随该知识点累计次数 n 递减
+  K 随该知识点累计次数 n 递减；独立或看提示做对（会，没看完整讲解）时 theta 不下降，免得做对了掌握度反而变低
 - 掌握度 = 面对难度 3 的小问做对的概率 sigmoid(theta)
 - 当前掌握度：正的能力值按距上次练习的时间衰减（半衰期 10 天起，每多练一次翻倍，最长 120 天）；负的不衰减
 """
@@ -106,7 +106,7 @@ def replay(attempts, until=None):
     按时间顺序重放作答记录，得到每个知识点的能力值、累计作答量与最近练习时间。
 
     参数:
-        attempts: 作答记录列表（每个小问一条，含 ts、result、score、difficulty、concept_weights、verified、self_report）
+        attempts: 作答记录列表（每个小问一条，含 ts、result、score、solution_viewed、difficulty、concept_weights、verified、self_report）
         until: 只重放该时间（字符串，含）之前的记录
     返回:
         dict，知识点 -> {theta, peak, n, events, last_ts}
@@ -119,10 +119,12 @@ def replay(attempts, until=None):
             continue
         s = a["score"] if a["score"] is not None else RESULT_SCORE[a["result"]]
         m = factor if a["result"] == "会" and not a["verified"] else 1.0
+        solved = a["result"] == "会" and not a["solution_viewed"]
         for c, w in json.loads(a["concept_weights"]).items():
             st = state.setdefault(c, {"theta": 0.0, "peak": 0.0, "n": 0.0, "events": 0, "last_ts": ""})
             k = K0 / (1.0 + K_DECAY * st["n"])
-            st["theta"] += k * w * m * (s - p_correct(st["theta"], a["difficulty"]))
+            step = k * w * m * (s - p_correct(st["theta"], a["difficulty"]))
+            st["theta"] += max(0.0, step) if solved else step
             st["peak"] = max(st["peak"], st["theta"])
             st["n"] += w
             st["events"] += 1

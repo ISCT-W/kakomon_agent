@@ -8,7 +8,7 @@ const OK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="
 const SUBJECTS = [["数学", "数学"], ["la", "线性代数"], ["prob", "概率论"], ["calc", "微积分"], ["计算机", "计算机"]];
 const SUBJECT_NAME = Object.fromEntries(SUBJECTS);
 const S = { running: false, stick: true, plan: null, similar: null, simFor: "", progress: {}, pending: {}, sent: {}, tab: "题目", item: 0,
-  scan: true, ws: { items: [] }, wsStamp: null, subject: "数学" };
+  scan: true, ws: { items: [] }, wsStamp: null, subject: "数学", st: null };
 const thread = $("#thread");
 
 async function api(path, body) {
@@ -77,9 +77,15 @@ function toBottom(force) { if (force || S.stick) thread.scrollTop = thread.scrol
 thread.addEventListener("scroll", () => { S.stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120; });
 
 function hello() {
-  thread.innerHTML = '<div class="hello"><b>你好！</b>可以这样开始：<ul>' +
-    ["我考东科大计算机，2027 年 8 月考试，数学该怎么复习？", "出一道线性代数特征值的题，从简单的开始", "今天练什么？"]
-      .map(x => '<li><a href="#/" data-say="' + esc(x) + '">' + esc(x) + "</a></li>").join("") + "</ul></div>";
+  const st = S.st || {}, g = st.goal, due = (st.due || {}).count || 0;
+  const top = (st.mastery || []).find(m => m.level !== "掌握");
+  const says = g
+    ? [due ? "开始复习到期的题" : "", "今天练什么？", top ? "出一道“" + top.name.replace(/（.*?）/g, "") + "”的题" : "",
+      g.universities[0] + "常考什么？"].filter(Boolean).slice(0, 3)
+    : ["我考东科大计算机，2027 年 8 月考试，数学该怎么复习？", "出一道线性代数特征值的题，从简单的开始", "今天练什么？"];
+  const lead = g && g.days != null && g.days >= 0 ? "离考试还有 " + g.days + " 天" + (due ? "，" + due + " 道题到期复习" : "") + "。" : "";
+  thread.innerHTML = '<div class="hello"><b>你好！</b>' + esc(lead) + "可以这样开始：<ul>" +
+    says.map(x => '<li><a href="#/" data-say="' + esc(x) + '">' + esc(x) + "</a></li>").join("") + "</ul></div>";
 }
 
 function addUser(text) {
@@ -261,7 +267,9 @@ function items() {
 }
 
 function srcLine(s) {
-  return [s.university, s.graduate_school, s.admission_year ? s.admission_year + " 年度入学" : "", s.paper_title].filter(Boolean).join(" · ");
+  const held = String(s.exam_held || "").match(/^(\d{4})-(\d{2})/);
+  return [s.university, s.graduate_school, s.admission_year ? s.admission_year + " 年度入学" + (held ? "（" + held[1] + " 年 " + (+held[2]) + " 月考试）" : "") : "",
+    s.paper_title].filter(Boolean).join(" · ");
 }
 
 function titleOf(s) {
@@ -334,21 +342,22 @@ function renderWork() {
     } else {
       const sol = it.solution;
       if (sol) {
-        const ai = /AI/.test(sol.label || "");
+        const warn = /未经人工确认/.test(sol.label || "");
         const undone = focus.length || Object.keys(rec).length ? (it.subquestions || []).map(x => x.label).filter(l => !rec[l]) : [];
-        body = '<div class="solmeta"><span class="chip ' + (ai ? "warn" : "blue") + '">' + esc(sol.label) + "</span>" +
+        body = '<div class="solmeta"><span class="chip ' + (warn ? "warn" : "blue") + '">' + esc(sol.label) + "</span>" +
           (sol.source ? "<span>来源：" + esc(sol.source) + "</span>" : "") + (sol.covers && sol.covers !== "全部" ? "<span>覆盖小问：" + esc(sol.covers) + "</span>" : "") +
           (sol.verified ? "<span>核对：" + esc(sol.verified) + "</span>" : "") + "</div>" +
           (undone.length ? '<p class="note">解答也包含你还没做的 ' + esc(undone.length > 6 ? undone.slice(0, 6).join("、") + " 等" : undone.join("、")) +
             "，想先自己试就别往下看。</p>" : "") + '<div class="md">' + renderMd(sol.text) + "</div>";
       } else {
         body = '<div class="empty" style="min-height:200px"><b>还没有解答</b><span>题库里没有现成解答时，助手会写一份 AI 解答并保存，之后直接复用</span>' +
-          '<button type="button" class="btn primary" data-say="' + esc("讲解一下这道题：" + srcLine(s) + " " + titleOf(s) + "（" + it.problem_id + "）") + '">请助手讲解</button></div>';
+          '<button type="button" class="btn primary" data-say="' + esc("讲解一下这道题：" + srcLine(s) + " " + titleOf(s)) + '" data-ref="' + esc(it.problem_id) +
+          '">请助手讲解</button></div>';
       }
       if (S.similar && S.similar.length && (!S.simFor || S.simFor === it.problem_id)) {
         body += '<div class="sim"><h3>相似题</h3>' + S.similar.map((r, i) => '<div class="row"><div class="l"><b>' + esc(r.source) + "</b><span>" + esc(r.title) +
           '</span></div><span class="note">难度 ' + esc(r.difficulty) + "/5" + (r.last_result ? " · 上次 " + esc(r.last_result) : "") + '</span><button type="button" class="btn' +
-          (i === 0 ? " primary" : "") + '" data-say="' + esc("我想做这道题：" + r.source + "（" + r.problem_id + "）") + '">做这题</button></div>').join("") + "</div>";
+          (i === 0 ? " primary" : "") + '" data-say="' + esc("我想做这道题：" + r.source) + '" data-ref="' + esc(r.problem_id) + '">做这题</button></div>').join("") + "</div>";
       }
     }
     if (focus.length) {
@@ -362,14 +371,14 @@ function renderWork() {
     } else if (Object.keys(rec).length) {
       foot = "<span>" + (it.solution ? "解答已保存 · " : "") + "本题进度</span>" + Object.entries(rec).map(([l, r]) =>
         '<span class="sq ' + (r === "会" ? "done" : "bad") + '">' + esc(l) + " " + esc(r) + "</span>").join("");
-    } else if (it.solution) {
-      foot = "<span>解答已保存，之后同一道题直接复用</span>";
     } else {
-      foot = "<span>展示中，未出题</span>" + '<button type="button" class="btn" data-say="' + esc("出这道题给我做：" + srcLine(s) + " " + titleOf(s) + "（" + it.problem_id + "）") + '">做这道题</button>';
+      foot = "<span>展示中，未出题</span>" + '<button type="button" class="btn" data-say="' + esc("出这道题给我做：" + srcLine(s) + " " + titleOf(s)) +
+        '" data-ref="' + esc(it.problem_id) + '">做这道题</button>';
     }
   }
   w.innerHTML = head + '<div class="wbody">' + body + "</div>" + (foot ? '<div class="wfoot">' + foot + "</div>" : "");
   markLang(w);
+  document.querySelector(".chips").hidden = !list.some(x => (x.focus || []).length);
 }
 
 $("#work").addEventListener("click", e => {
@@ -388,7 +397,7 @@ $("#work").addEventListener("click", e => {
     S.pending = {};
     renderWork();
     send(msg, { feedback: { problem_id: it.problem_id, results } });
-  } else if (b.dataset.say) { e.preventDefault(); send(b.dataset.say); }
+  } else if (b.dataset.say) { e.preventDefault(); send(b.dataset.say, b.dataset.ref ? { ref: b.dataset.ref } : undefined); }
 });
 
 /* ---------- 顶栏与右栏 ---------- */
@@ -403,6 +412,8 @@ function goalText(g) {
 async function refreshState() {
   let st;
   try { st = await getJSON("/api/state"); } catch (e) { return; }
+  S.st = st;
+  if (thread.querySelector(".hello")) hello();
   const g = $("#goal");
   g.textContent = st.goal ? goalText(st.goal) : "还没有设定备考目标";
   g.className = "goal " + (st.goal ? "set" : "none");

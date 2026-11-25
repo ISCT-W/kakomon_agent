@@ -1,6 +1,7 @@
 """
 题库查询（只读）：知识点表与别名、知识点搜索、候选小问（主/次知识点）、相邻知识点、分层找题、大题详情、题库概况。
 """
+import difflib
 import json
 import os
 import re
@@ -36,8 +37,18 @@ UNIVERSITY_ALIASES = {
     "keio": "慶應義塾大学", "电通": "電気通信大学", "電通": "電気通信大学", "电通大": "電気通信大学",
     "電通大": "電気通信大学", "uec": "電気通信大学", "阪公大": "大阪公立大学", "大阪公立": "大阪公立大学",
     "osakametropolitan": "大阪公立大学", "东科大": "東京工業大学", "東科大": "東京工業大学", "东科": "東京工業大学",
-    "東科": "東京工業大学",
+    "東科": "東京工業大学", "広大": "広島大学", "神大": "神戸大学", "埼大": "埼玉大学", "中大": "中央大学",
+    "名工大": "名古屋工業大学", "名古屋工大": "名古屋工業大学", "農工大": "東京農工大学", "金大": "金沢大学", "岡大": "岡山大学", "静大": "静岡大学",
+    "新大": "新潟大学", "京工繊": "京都工芸繊維大学", "御茶水女子大学": "お茶の水女子大学",
+    "御茶之水女子大学": "お茶の水女子大学", "御茶水": "お茶の水女子大学", "お茶大": "お茶の水女子大学",
+    "茶大": "お茶の水女子大学", "函館未来大学": "公立はこだて未来大学", "公立函館未来大学": "公立はこだて未来大学",
+    "はこだて未来大学": "公立はこだて未来大学", "未来大": "公立はこだて未来大学",
 }
+# 简体、繁体字 -> 日文字形（只列校名里常见、写法不同的字），用来把中文校名对上题库里的日文校名
+VARIANTS = str.maketrans(dict(p for p in (
+    "东東 广広 廣広 岛島 户戸 戶戸 业業 农農 电電 气気 氣気 稻稲 庆慶 应應 义義 泽沢 澤沢 冈岡 艺芸 藝芸 纤繊 纖繊 维維 "
+    "馆館 叶葉 滨浜 濱浜 县県 縣県 齿歯 齒歯 术術 语語 桥橋 丰豊 豐豊 综総 綜総 陆陸 关関 關関 习習 龙龍 宫宮 儿児 "
+    "兒児 德徳 爱愛 贺賀 鸟鳥 马馬 兰蘭 带帯 帶帯 见見 机機 报報 长長 库庫 产産 冲沖 绳縄 繩縄 靜静 學学 國国 會会 醫医").split()))
 
 SEVEN_IMPERIAL = ["東京大学", "京都大学", "大阪大学", "東北大学", "名古屋大学", "九州大学", "北海道大学"]
 UNIVERSITY_GROUPS = {"七帝大": SEVEN_IMPERIAL, "旧帝大": SEVEN_IMPERIAL, "旧七帝大": SEVEN_IMPERIAL,
@@ -121,39 +132,92 @@ def connect(path=None):
     return con
 
 
-def resolve_university(name):
+def fold(s):
     """
-    把学校简称、英文名、新校名映射为题库中的校名。
+    校名匹配用的规范化：在 norm 的基础上把简体、繁体字换成日文字形（“广岛大学”“廣島大學” -> “広島大学”）。
+
+    参数:
+        s: 字符串
+    返回:
+        str
+    """
+    return norm(s).translate(VARIANTS)
+
+
+def universities(con):
+    """
+    题库里的校名（按有效大题数从多到少）。
+
+    参数:
+        con: 数据库连接
+    返回:
+        list[str]
+    """
+    return [r[0] for r in con.execute("""
+        SELECT d.university FROM documents d JOIN problems p ON p.doc_id = d.doc_id
+        WHERE p.duplicate_of IS NULL OR p.duplicate_of = '' GROUP BY d.university ORDER BY COUNT(*) DESC""")]
+
+
+def resolve_university(name, known=()):
+    """
+    把学校简称、英文名、新校名、简体或繁体中文校名映射为题库中的校名。
 
     参数:
         name: 用户输入的学校名
+        known: 题库中的校名（按字形对上中文写法；省略“大学”或只写“大”也行）
     返回:
         str，题库中的校名（无法识别时原样返回）
     """
     key = (name or "").strip()
-    return UNIVERSITY_ALIASES.get(key) or UNIVERSITY_ALIASES.get(norm(key)) or key
+    f = fold(key)
+    hit = UNIVERSITY_ALIASES.get(key) or UNIVERSITY_ALIASES.get(norm(key)) or UNIVERSITY_ALIASES.get(f)
+    if hit or not f:
+        return hit or key
+    by_fold = {fold(u): u for u in known}
+    return next((by_fold[k] for k in (f, f + "大学", re.sub("大$", "大学", f)) if k in by_fold), key)
 
 
-def resolve_universities(names):
+def resolve_universities(names, con=None):
     """
     把一所或多所学校的写法展开成题库中的校名列表：可以用逗号、顿号、加号、斜杠分隔多所学校，
     也可以写学校组（“七帝大”“旧帝大”展开成 7 所旧帝国大学）。例：“七帝大+东科大” -> 8 所。
 
     参数:
         names: 字符串或字符串列表
+        con: 题库连接（给出时按字形对上中文校名，如“广岛大学”）
     返回:
         list[str]，去重后的校名
     """
     parts = names if isinstance(names, (list, tuple)) else UNIVERSITY_SEP.split(names or "")
+    known = universities(con) if con else ()
     out = []
     for p in parts:
         p = (p or "").strip()
         if not p:
             continue
-        for name in UNIVERSITY_GROUPS.get(p) or UNIVERSITY_GROUPS.get(norm(p)) or [resolve_university(p)]:
+        for name in UNIVERSITY_GROUPS.get(p) or UNIVERSITY_GROUPS.get(norm(p)) or [resolve_university(p, known)]:
             if name not in out:
                 out.append(name)
     return out
+
+
+def university_note(con, names):
+    """
+    题库里找不到的校名，附写法相近的校名（没有相近的就列出题库里的全部学校），并入工具结果让 Claude 换校名重试。
+
+    参数:
+        con: 数据库连接
+        names: resolve_universities 的结果
+    返回:
+        dict，都找得到时为空
+    """
+    known = universities(con)
+    missing = [u for u in names if not any(u in k for k in known)]
+    if not missing:
+        return {}
+    by_fold = {fold(k): k for k in known}
+    near = [by_fold[f] for u in missing for f in difflib.get_close_matches(fold(u), list(by_fold), n=3, cutoff=0.6)]
+    return {"university_not_found": missing, "university_candidates": list(dict.fromkeys(near)) or known}
 
 
 def resolve_program(keyword):
@@ -233,7 +297,7 @@ def exam_trends(con, university="", program="", subjects=(), top_n=15):
     返回:
         dict：scope（学校、匹配到的专攻、年度、大题数）与 concepts（name、unit、problems、years、last）
     """
-    unis = resolve_universities(university) if university else []
+    unis = resolve_universities(university, con) if university else []
     parts = resolve_program(program) if program else []
     sids = resolve_subjects(con, subjects)
     rows = [r for r in con.execute("""
@@ -272,7 +336,7 @@ def matched_programs(con, keyword, university=""):
     返回:
         list[str]，“学校 专攻”
     """
-    parts, unis = resolve_program(keyword), resolve_universities(university) if university else []
+    parts, unis = resolve_program(keyword), resolve_universities(university, con) if university else []
     out = set()
     for r in con.execute("SELECT DISTINCT university, program, program_folder FROM documents"):
         if (not unis or any(u in r["university"] for u in unis)) and \
@@ -399,7 +463,7 @@ def candidates(con, concept_prefixes, university="", program="", roles=("primary
         WHERE sc.role IN ({",".join("?" * len(roles))}) AND ({cond}) AND (p.duplicate_of IS NULL OR p.duplicate_of = '')"""
     params = list(roles) + params
     if university:
-        unis = resolve_universities(university)
+        unis = resolve_universities(university, con)
         sql += " AND (" + " OR ".join("d.university LIKE ?" for _ in unis) + ")"
         params += ["%" + u + "%" for u in unis]
     if program:
@@ -585,11 +649,11 @@ def rank(con, total, why, snippets=None, university="", program="", question_typ
     pids = list(total)
     rows = {r["problem_id"]: r for r in con.execute(f"""
         SELECT p.problem_id, p.label, p.section, p.admission_year, p.title_zh, p.difficulty, p.est_minutes,
-               p.solution_md != '' AS has_solution, d.university, d.program, d.program_folder, d.paper_title
+               p.solution_md != '' AS has_solution, d.university, d.program, d.program_folder, d.paper_title, d.exam_held
         FROM problems p JOIN documents d ON d.doc_id = p.doc_id
         WHERE p.problem_id IN ({','.join('?' * len(pids))}) AND (p.duplicate_of IS NULL OR p.duplicate_of = '')""", pids)}
     seen_in = also_in(con, list(rows))
-    unis = resolve_universities(university) if university else []
+    unis = resolve_universities(university, con) if university else []
     parts = resolve_program(program) if program else []
     subqs = defaultdict(list)
     for s in con.execute(f"""
@@ -613,7 +677,8 @@ def rank(con, total, why, snippets=None, university="", program="", question_typ
             continue
         row = {"problem_id": pid, "score": round(total[pid], 1), "matched_by": why[pid],
                "source": {"university": r["university"], "program": r["program"], "admission_year": r["admission_year"],
-                          "paper_title": r["paper_title"], "problem_label": r["label"], "section": r["section"]},
+                          "exam_held": r["exam_held"] or "", "paper_title": r["paper_title"], "problem_label": r["label"],
+                          "section": r["section"]},
                "title_zh": r["title_zh"], "difficulty": r["difficulty"], "est_minutes": r["est_minutes"],
                "solutions": solutions.available(pid, r["has_solution"]), "also_in": seen_in.get(pid, [])}
         if not brief:
@@ -831,7 +896,7 @@ def overview(con, university=""):
         dict
     """
     live = "(p.duplicate_of IS NULL OR p.duplicate_of = '')"
-    unis = resolve_universities(university) if university else []
+    unis = resolve_universities(university, con) if university else []
     where = (" AND (" + " OR ".join("d.university LIKE ?" for _ in unis) + ")") if unis else ""
     params = ["%" + u + "%" for u in unis]
     papers = con.execute(f"""

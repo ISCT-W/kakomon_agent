@@ -190,6 +190,23 @@ class App:
             os.remove(self.path("session.json"))
 
 
+def source_text(s, program=True):
+    """
+    出处的一行写法：学校（专攻）· 年度（考试年月，同一年度考两次时靠它区分）· 卷名与题号（卷名里已有题号时不重复）。
+
+    参数:
+        s: 题目的 source（bank.problem_detail 或找题结果里的）
+        program: 是否写专攻
+    返回:
+        str
+    """
+    held = re.match(r"(\d{4})-(\d{2})", s.get("exam_held") or "")
+    year = (f"{s['admission_year']} 年度" if s.get("admission_year") else "") + (f"（{held[1]} 年 {int(held[2])} 月考试）" if held else "")
+    paper, label = s.get("paper_title") or "", s.get("problem_label") or ""
+    head = s.get("university", "") + (" " + s.get("program", "") if program and s.get("program") else "")
+    return " · ".join(x for x in (head, year, paper if label and label in paper else f"{paper} {label}".strip()) if x)
+
+
 def tool_data(name, text):
     """
     从工具结果里取界面要用的部分（其余丢掉，保持数据流小）。
@@ -210,8 +227,7 @@ def tool_data(name, text):
         return None
     if name == "similar_problems":
         return {"results": [{"problem_id": r["problem_id"], "title": r["title_zh"], "difficulty": r["difficulty"],
-                             "source": f"{r['source']['university']} {r['source']['program']} · {r['source']['admission_year']} · "
-                                       f"{r['source']['problem_label']}", "last_result": r.get("last_result", "")}
+                             "source": source_text(r["source"]), "last_result": r.get("last_result", "")}
                             for r in d.get("results", [])[:6]]}
     if name == "record_attempt":
         return {"problem_id": d.get("problem_id", ""), "subquestions": d.get("subquestions", []),
@@ -238,7 +254,7 @@ def record_feedback(app, feedback):
     return bool(tutor.record_attempt(app.bank, app.learn, pid, results=results).get("recorded"))
 
 
-def run_chat(app, handler, message, model, feedback=None):
+def run_chat(app, handler, message, model, feedback=None, ref=""):
     """
     运行一轮对话：调用 headless Claude Code，把流式事件翻译成界面事件（SSE）写回浏览器，结束后写入对话记录。
     同一会话接续 SESSION_TURNS 轮后换新会话，新会话的第一条消息前面附上 App.recap 的接续上下文。
@@ -249,6 +265,7 @@ def run_chat(app, handler, message, model, feedback=None):
         message: 学生这一轮说的话
         model: sonnet 或 opus
         feedback: 题目区点选的结果（见 record_feedback），先直接记录再告诉助手
+        ref: 界面按钮附带的题目 ID（只发给助手，对话记录里只留学生看到的话）
     """
     alive = [True]
 
@@ -261,7 +278,7 @@ def run_chat(app, handler, message, model, feedback=None):
         except (BrokenPipeError, ConnectionResetError):
             alive[0] = False
 
-    prompt = message
+    prompt = message + (f"（题目 ID：{ref}）" if ref else "")
     if feedback and record_feedback(app, feedback):
         send({"t": "recorded", "problem_id": feedback["problem_id"]})
         prompt += "（已在题目区记录）"
@@ -431,7 +448,7 @@ def due_item(app, d):
     p = bank.problem_detail(app.bank, d["problem_id"]) or {"subquestions": [], "source": {}}
     labels = {s["key"]: s["label"] for s in p["subquestions"]}
     s = p["source"]
-    return {"problem_id": d["problem_id"], "source": f"{s.get('university', '')} {s.get('admission_year', '')} {s.get('problem_label', '')}".strip(),
+    return {"problem_id": d["problem_id"], "source": source_text(s, program=False),
             "labels": [labels.get(k, k) for k in d["keys"]], "overdue_days": d["overdue_days"]}
 
 
@@ -618,8 +635,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
+                ref = body.get("ref") if isinstance(body.get("ref"), str) and re.fullmatch(r"[\w.-]{1,80}", body["ref"]) else ""
                 run_chat(self.app, self, message, "opus" if body.get("model") == "opus" else "sonnet",
-                         body.get("feedback") if isinstance(body.get("feedback"), dict) else None)
+                         body.get("feedback") if isinstance(body.get("feedback"), dict) else None, ref)
             finally:
                 self.app.lock.release()
             return
